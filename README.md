@@ -96,6 +96,7 @@ You can quit the REPL with `!quit`.
 
 Fields can reference their previous value with the keyword `this`. This program
 will simply count the number of ticks passed:
+
 ```test_projects/simple_counter```
 ```Simulgine
 class ROOT {
@@ -104,6 +105,7 @@ class ROOT {
 ```
 
 Fields can reference another field in their class with the keyword `parent`.
+
 ```test_projects/parent_and_counter```
 ```Simulgine
 class ROOT {
@@ -171,7 +173,8 @@ class ROOT {
 
 Simulgine, by default, computes all the values **at once**. This is a flagship
 feature, and allows for massive parallelization, as well as eliminating all
-race conditions.This means that every fields can only see stale values from other fields.
+race conditions. This means that every field can only see stale values from
+other fields.
 
 This is acceptable in most cases, but sometimes syncronization is required. In
 this case, a turbofish can be added after a field's name in order to order it.
@@ -179,7 +182,8 @@ By default, fields have a stage of **1**. A field will compute only after all
 fields in the class with a lower stage than it have finished being computed,
 and will see the newer values.
 
-This will take two `!tick`s for follower to become `"Hello, world!"`:
+This will take two `!tick`s for `follower` to become `"Hello, world!"`:
+
 ```test_projects/nostaging```
 ```Simulgine
 class ROOT {
@@ -189,6 +193,7 @@ class ROOT {
 ```
 
 This will only take one `!tick`:
+
 ```test_projects/yesstaging```
 ```Simulgine
 class ROOT {
@@ -211,10 +216,11 @@ if [condition] [onTrue] {optional: else [onFalse]}
 `onTrue` and `onFalse` are both **expressions** and *not* statements. They
 do not end with a semicolon unless surrounded by curly braces. The if statement
 itself is also an expression: It returns None without an else clause (except in
-the REPL) and returns whichever subexpression was computer when it does have an
+the REPL) and returns whichever subexpression was computed when it does have an
 else clause.
 
 Try this:
+
 ```test_projects/ifwithbrace```
 ```Simulgine
 class ROOT {
@@ -230,6 +236,7 @@ class ROOT {
 ```
 
 The curly braces are purely aesthetics here; this works too:
+
 ```test_projects/ifwobrace```
 ```Simulgine
 class ROOT {
@@ -288,6 +295,7 @@ class ROOT {
 ```
 
 You can access an outer braces variable from a more inner one, as well.
+
 ```test_projects/lotserletser```
 ```Simulgine
 class ROOT {
@@ -297,7 +305,7 @@ class ROOT {
         let other: u32 = {
             let useless: u16 = moreUseless;
 
-            useless; // 724
+            useless;
         };
 
         other = useless + other;
