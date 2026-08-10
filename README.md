@@ -32,6 +32,7 @@ Every Simulgine program must have a **ROOT** class that is the parent of all
 other classes.
 
 A basic 'Hello, World!' would be this:
+
 ```test_projects/hellosim```
 ```Simulgine
 class ROOT {
