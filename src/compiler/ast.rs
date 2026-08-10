@@ -14,7 +14,8 @@ type FASTSubexpr = Box<FASTNode>;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Type {
     UserClass,
-    UnlinkedType,
+    Unlinked,
+    #[allow(clippy::enum_variant_names)]
     Type,
     Error,
     I64,
@@ -55,7 +56,7 @@ pub enum TypeIdentifier {
 
 impl From<TypeIdentifier> for Type {
     fn from(value: TypeIdentifier) -> Self {
-        return (&value).into();
+        (&value).into()
     }
 }
 
@@ -63,7 +64,7 @@ impl From<&TypeIdentifier> for Type {
     fn from(value: &TypeIdentifier) -> Self {
         match value {
             TypeIdentifier::UserClass(_) => Type::UserClass,
-            TypeIdentifier::UnlinkedType(_) => Type::UnlinkedType,
+            TypeIdentifier::UnlinkedType(_) => Type::Unlinked,
             TypeIdentifier::Type(_) => Type::Type,
             TypeIdentifier::Error => Type::Error,
             TypeIdentifier::I64 => Type::I64,
@@ -90,7 +91,7 @@ impl TryFrom<&Type> for TypeIdentifier {
     fn try_from(value: &Type) -> Result<TypeIdentifier, TypeIdentifierToTypeError> {
         match value {
             Type::UserClass => Err(TypeIdentifierToTypeError),
-            Type::UnlinkedType => Err(TypeIdentifierToTypeError),
+            Type::Unlinked => Err(TypeIdentifierToTypeError),
             Type::Type => Err(TypeIdentifierToTypeError),
             Type::Error => Ok(TypeIdentifier::Error),
             Type::I64 => Ok(TypeIdentifier::I64),
@@ -130,7 +131,7 @@ pub static EQUALLABLETYPES: [Type; 13] = [
 
 pub static TYPES: [Type; 17] = [
     Type::UserClass,
-    Type::UnlinkedType,
+    Type::Unlinked,
     Type::Type,
     Type::Error,
     Type::U8,
@@ -295,7 +296,7 @@ impl Type {
             Type::UserClass => x == &Type::UserClass,
             Type::Type => x == &Type::Type,
             Type::Error => false,
-            Type::UnlinkedType => false,
+            Type::Unlinked => false,
             Type::I64 => [
                 &Type::I64,
                 &Type::I32,
@@ -534,7 +535,7 @@ impl TypeInstance {
 
     pub fn as_type_identifier(value: &Self) -> TypeIdentifier {
         match value {
-            TypeInstance::UserClass(x) => TypeIdentifier::UserClass(x.val.class.clone()),
+            TypeInstance::UserClass(x) => TypeIdentifier::UserClass(x.val.class),
             TypeInstance::Type(x) => TypeIdentifier::Type(Box::new(x.val.clone())),
             TypeInstance::I64(_) => TypeIdentifier::I64,
             TypeInstance::I32(_) => TypeIdentifier::I32,
@@ -585,7 +586,7 @@ impl TypeInstance {
             TypeInstance::U16(_) => None,
             TypeInstance::U8(_) => None,
             TypeInstance::Float(x) => Some(x.val as f64),
-            TypeInstance::Double(x) => Some(x.val as f64),
+            TypeInstance::Double(x) => Some(x.val),
             TypeInstance::String(_) => None,
             TypeInstance::Boolean(_) => None,
             TypeInstance::None => None,
@@ -646,6 +647,7 @@ impl TypeInstance {
 }
 
 impl TypeReference<'_> {
+    #[allow(dead_code)] // Here for throughness sake.
     pub fn as_type(value: &Self) -> Type {
         match value {
             TypeReference::Instance(type_instance) => TypeInstance::as_type(type_instance),
@@ -698,6 +700,7 @@ impl TypeReference<'_> {
         format!("[{}] {}", type_str, inner)
     }
 
+    #[allow(dead_code)] // Here for throughness sake.
     pub fn to_string(&self, sim: &Simulgine) -> String {
         match self {
             TypeReference::Instance(type_instance) => type_instance.to_string(sim),
@@ -841,7 +844,7 @@ pub enum FASTContent {
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum FASTReference {
-    ROOT,
+    Root,
     Variable(ASTVarRef),
     Inner(Box<FASTReference>, usize),
 }
@@ -900,11 +903,13 @@ pub enum ASTNodeInner {
 }
 
 #[derive(PartialEq, Debug)]
+#[allow(clippy::upper_case_acronyms)]
 pub struct AST {
     pub(crate) root: Vec<ASTNodeDefinitionClass>,
 }
 
 #[derive(FromPrimitive, ToPrimitive)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum Precedence {
     NONE = 0,
     ASSIGNMENT, // =

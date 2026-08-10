@@ -168,7 +168,7 @@ impl<T: Iterator<Item = Token>> ASTBuilder<T> {
         };
         let tok = self.advance();
         if token_t == tok.token_type {
-            return Some(tok);
+            Some(tok)
         } else {
             self.dyn_error_at(
                 format!(
@@ -200,10 +200,7 @@ impl<T: Iterator<Item = Token>> ASTBuilder<T> {
             _ => unreachable!(),
         };
 
-        ASTNode {
-            token: c,
-            inner: inner,
-        }
+        ASTNode { token: c, inner }
     }
 
     pub(super) fn parse_grouping(&mut self, token: Token) -> ASTNode {
@@ -403,7 +400,7 @@ impl<T: Iterator<Item = Token>> ASTBuilder<T> {
         }
 
         let n_vars = self.blocks.pop();
-        if let None = n_vars {
+        if n_vars.is_none() {
             return self.dyn_error_at(
                 "Cannot use let outside of a brace-block.".to_string(),
                 &token,

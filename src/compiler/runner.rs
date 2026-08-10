@@ -57,7 +57,7 @@ impl From<std::io::Error> for SimulgineErrors {
 
 impl From<ASTLinkError> for SimulgineErrors {
     fn from(value: ASTLinkError) -> Self {
-        return SimulgineErrors::LinkError(vec![value]);
+        SimulgineErrors::LinkError(vec![value])
     }
 }
 
@@ -65,7 +65,7 @@ pub struct FASTExecContext<'a> {
     vars: Vec<Vec<TypeReference<'a>>>,
 }
 
-pub fn tick_field<'a, 'b, 'c, 'd, 'e, 'f, 'g>(
+pub fn tick_field<'a, 'c, 'd, 'e, 'g>(
     prev: &'a TypeInstance,
     parent: &'g UserObject,
     field: &'c UserClassMember,
@@ -93,9 +93,9 @@ pub fn calc_field(
     class: &UserClass,
     sim: &SimulgineInst,
 ) -> TypeInstance {
-    if &class.fields[i].change_level == &FieldChangeLevel::Const {
+    if class.fields[i].change_level == FieldChangeLevel::Const {
         f.clone()
-    } else if &class.fields[i].change_level == &FieldChangeLevel::Level {
+    } else if class.fields[i].change_level == FieldChangeLevel::Level {
         if let TypeInstance::UserClass(x) = &t.fields[i] {
             let fs = tick_obj(&x.val, sim);
             TypeInstance::UserClass(UserClassInst { val: fs })
@@ -103,7 +103,7 @@ pub fn calc_field(
             f.clone()
         }
     } else {
-        tick_field(&f, t, &class.fields[i], sim)
+        tick_field(f, t, &class.fields[i], sim)
     }
 }
 
@@ -140,8 +140,8 @@ fn get_var_val<'a, 'b>(context: &'a FASTExecContext<'b>, var: ASTVarRef) -> &'a 
         .index(var.indx as usize)
 }
 
-fn set_var_val<'a, 'b>(
-    context: &'b mut FASTExecContext<'a>,
+fn set_var_val<'a>(
+    context: &mut FASTExecContext<'a>,
     var: ASTVarRef,
     val: TypeReference<'a>,
 ) -> TypeReference<'a> {
@@ -269,11 +269,9 @@ where
     'c: 'd,
 {
     match node {
-        FASTReference::ROOT => {
-            return TypeReference::UserClassRO(UserClassROInst { val: &sim.root })
-        }
+        FASTReference::Root => TypeReference::UserClassRO(UserClassROInst { val: &sim.root }),
         FASTReference::Inner(fastreference, s) => {
-            let res = resolve_inner_reference(&*fastreference, context, sim);
+            let res = resolve_inner_reference(fastreference, context, sim);
             match res {
                 TypeReference::Instance(_type_instance) => unreachable!("Inner ('.') is somehow trying to access a field on something not an UserObject."),
                 TypeReference::UserClassRO(user_class_roinst) => {
@@ -291,12 +289,12 @@ where
         }
         FASTReference::Variable(x) => {
             let val = get_var_val(context, x.clone());
-            return val.clone();
+            val.clone()
         }
     }
 }
 
-pub(crate) fn execute_fast_node<'a, 'b, 'c, 'd, 'f>(
+pub(crate) fn execute_fast_node<'a, 'b, 'c, 'f>(
     node: &'a FASTNode,
     context: &'b mut FASTExecContext<'c>,
     sim: &'c SimulgineInst<'f>,
@@ -341,7 +339,7 @@ pub(crate) fn execute_fast_node<'a, 'b, 'c, 'd, 'f>(
         FASTContent::Reference(node) => resolve_inner_reference(node, context, sim),
         _ => TypeReference::Instance(match &node.node {
             FASTContent::Integer(x) => match node.ret_type {
-                TypeIdentifier::I64 => TypeInstance::I64(I64Inst { val: *x as i64 }),
+                TypeIdentifier::I64 => TypeInstance::I64(I64Inst { val: *x }),
                 TypeIdentifier::I32 => TypeInstance::I32(I32Inst { val: *x as i32 }),
                 TypeIdentifier::I16 => TypeInstance::I16(I16Inst { val: *x as i16 }),
                 TypeIdentifier::I8 => TypeInstance::I8(I8Inst { val: *x as i8 }),
@@ -365,7 +363,7 @@ pub(crate) fn execute_fast_node<'a, 'b, 'c, 'd, 'f>(
                 val: type_identifier.clone(),
             }),
             FASTContent::Negate(fastnode) => {
-                let res = execute_fast_node(&*fastnode, context, sim);
+                let res = execute_fast_node(fastnode, context, sim);
                 let TypeReference::Instance(res) = res else {
                     unreachable!("Negate can't negate references.")
                 };
@@ -392,7 +390,7 @@ pub(crate) fn execute_fast_node<'a, 'b, 'c, 'd, 'f>(
                 res
             }
             FASTContent::Not(fastnode) => {
-                let res = execute_fast_node(&*fastnode, context, sim);
+                let res = execute_fast_node(fastnode, context, sim);
                 let TypeReference::Instance(res) = res else {
                     unreachable!("Not can't negate references.")
                 };
@@ -407,14 +405,14 @@ pub(crate) fn execute_fast_node<'a, 'b, 'c, 'd, 'f>(
                 res
             }
             FASTContent::Typeof(fastnode) => {
-                let res = execute_fast_node(&*fastnode, context, sim);
+                let res = execute_fast_node(fastnode, context, sim);
 
                 TypeInstance::Type(TypeInst {
                     val: TypeReference::as_type_identifier(&res),
                 })
             }
             FASTContent::Instanceof(fastnode) => {
-                let res = execute_fast_node(&*fastnode, context, sim);
+                let res = execute_fast_node(fastnode, context, sim);
                 let TypeReference::Instance(res) = res else {
                     unreachable!("Not can't instantiate referenced classes.")
                 };
@@ -438,11 +436,11 @@ pub(crate) fn execute_fast_node<'a, 'b, 'c, 'd, 'f>(
                 number_worker!(|l, r| { l / r }, node, fastnode, fastnode1, context, sim)
             }
             FASTContent::Pow(fastnode, fastnode1) => {
-                let res = execute_fast_node(&*fastnode, context, sim);
+                let res = execute_fast_node(fastnode, context, sim);
                 let TypeReference::Instance(res) = res else {
                     unreachable!("Not can't pow references.")
                 };
-                let pow = execute_fast_node(&*fastnode1, context, sim)
+                let pow = execute_fast_node(fastnode1, context, sim)
                     .coerce_number_int()
                     .unwrap();
                 let res = match res {
@@ -562,7 +560,7 @@ fn parse_all_sml_in_dir(path: &Path) -> Result<Vec<PathBuf>, std::io::Error> {
 pub fn compile_directory(path: &Path) -> Result<Simulgine, SimulgineErrors> {
     let to_compile: Vec<PathBuf> = parse_all_sml_in_dir(path)?;
 
-    if to_compile.len() == 0 {
+    if to_compile.is_empty() {
         return Err(SimulgineErrors::NoSmlFile);
     };
 
@@ -599,7 +597,7 @@ pub fn run_free_expression<'a>(
             cur_class: None,
             classes: &sim.based.user_classes,
         },
-        &variables,
+        variables,
         &TYPES,
     )?;
 

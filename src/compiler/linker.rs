@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::write, format, sync::Mutex, write};
+use std::{collections::HashMap, format, sync::Mutex, write};
 
 use rayon::iter::{
     FromParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator,
@@ -41,7 +41,7 @@ fn link_field(
     if let Some(t) = t {
         Ok(UserClassMember {
             t: t.clone(),
-            class: user_classes.get(&class_name.to_string()).unwrap().clone(),
+            class: *user_classes.get(&class_name.to_string()).unwrap(),
             body: None,
             name: f.name.clone(),
             stage: f.turbofish,
@@ -50,7 +50,7 @@ fn link_field(
         })
     } else {
         Err(ASTLinkError {
-            token: f.token.clone(),
+            token: Box::new(f.token.clone()),
             err: ASTLinkErrorInner::InvalidFieldType(
                 f.name.clone(),
                 class_name.to_string(),
@@ -67,7 +67,7 @@ fn link_field_body(
     user_classes: &[UserClass],
     node: Option<ASTNode>,
 ) -> Option<std::result::Result<FASTNode, ASTLinkError>> {
-    return if let Some(x) = node {
+    if let Some(x) = node {
         assert_eq!(f.change_level, FieldChangeLevel::Volatile);
         match link_ast_node(
             x,
@@ -82,7 +82,7 @@ fn link_field_body(
                     name: "this".into(),
                 },
                 &ASTVariable {
-                    t: TypeIdentifier::UserClass(parent.clone()),
+                    t: TypeIdentifier::UserClass(parent),
                     name: "parent".into(),
                 },
             ]],
@@ -94,7 +94,7 @@ fn link_field_body(
                 } else {
                     let err = format!("Type mismatch, field {} has body that returns type {:#?} but has type {:#?}", f.name, x.ret_type, f.t).leak();
                     Some(Err(ASTLinkError {
-                        token: FileScanner::empty_error_token(err),
+                        token: Box::new(FileScanner::empty_error_token(err)),
                         err: ASTLinkErrorInner::Err,
                     }))
                 }
@@ -106,8 +106,9 @@ fn link_field_body(
             f.change_level == FieldChangeLevel::Const || f.change_level == FieldChangeLevel::Level
         );
         None
-    };
+    }
 }
+type DanglingField = (UserClassMember, Option<ASTNode>);
 pub fn link_ast(ast: AST) -> std::result::Result<Simulgine, SimulgineErrors> {
     let error: Mutex<Vec<ASTLinkError>> = Mutex::new(vec![]);
 
@@ -117,21 +118,19 @@ pub fn link_ast(ast: AST) -> std::result::Result<Simulgine, SimulgineErrors> {
         HashMap::<String, UserClassIndx>::from_par_iter(class_defs.par_iter().map(|x| {
             (
                 x.name.clone(),
-                UserClassIndx {
-                    0: class_defs.iter().position(|y| y == x).unwrap(),
-                },
+                UserClassIndx(class_defs.iter().position(|y| y == x).unwrap()),
             )
         }));
     if !classes_map.contains_key("ROOT") {
         (*error.lock().unwrap()).push(ASTLinkError {
-            token: FileScanner::empty_error_token(
+            token: Box::new(FileScanner::empty_error_token(
                 "Class ROOT is not defined. Don't confuse me, what am I supposed to start on?!?!?",
-            ),
+            )),
             err: ASTLinkErrorInner::Err,
         });
         return Err(SimulgineErrors::LinkError(error.into_inner().unwrap()));
     }
-    let fields: Vec<(String, Vec<(UserClassMember, Option<ASTNode>)>)> = class_defs
+    let fields: Vec<(String, Vec<DanglingField>)> = class_defs
         .into_iter()
         .map(|x| {
             let fields = x
@@ -152,7 +151,7 @@ pub fn link_ast(ast: AST) -> std::result::Result<Simulgine, SimulgineErrors> {
         })
         .collect();
 
-    if (*error.lock().unwrap()).len() != 0 {
+    if !(*error.lock().unwrap()).is_empty() {
         return Err(SimulgineErrors::LinkError(error.into_inner().unwrap()));
     }
 
@@ -162,19 +161,15 @@ pub fn link_ast(ast: AST) -> std::result::Result<Simulgine, SimulgineErrors> {
 
     for class_def in fields.into_iter() {
         // Check we don't have this class already
-        if baked_classes
-            .iter()
-            .find(|x| x.name == class_def.0)
-            .is_some()
-        {
+        if baked_classes.iter().any(|x| x.name == class_def.0) {
             (*error.lock().unwrap()).push(ASTLinkError {
-                token: FileScanner::empty_error_token(
+                token: Box::new(FileScanner::empty_error_token(
                     format!(
                         "Class {} is defined twice (or thrice) (or more-ice).",
                         &class_def.0
                     )
                     .leak(), // We can't proceed after an error anyway, so just leak it.
-                ),
+                )),
                 err: ASTLinkErrorInner::Err,
             });
             continue;
@@ -186,8 +181,6 @@ pub fn link_ast(ast: AST) -> std::result::Result<Simulgine, SimulgineErrors> {
             field_stages: Vec::new(),
             fields: Vec::with_capacity(class_def.1.len()),
         };
-        let mut i: usize = 0;
-
         // Retrieve its fields
         let mut fs = class_def
             .1
@@ -203,7 +196,7 @@ pub fn link_ast(ast: AST) -> std::result::Result<Simulgine, SimulgineErrors> {
         let staged = (0..fs.len())
             .collect::<Vec<_>>()
             .chunk_by(|a, b| fs.get(*a).unwrap().0.stage == fs.get(*b).unwrap().0.stage)
-            .map(|x| x.iter().map(|y| y.clone()).collect::<Vec<_>>())
+            .map(|x| x.to_vec())
             .collect::<Vec<_>>();
 
         class.field_stages = staged;
@@ -211,16 +204,15 @@ pub fn link_ast(ast: AST) -> std::result::Result<Simulgine, SimulgineErrors> {
         let (fields, node): (Vec<UserClassMember>, HashMap<String, Option<ASTNode>>) =
             fs.into_iter().unzip();
 
-        for a in fields {
+        for (i, a) in fields.into_iter().enumerate() {
             class.field_names.insert(a.name.clone(), i);
             class.fields.push(a);
-            i += 1;
         }
 
         nodes.insert(class.name.clone(), node);
         baked_classes.push(class);
 
-        if (*error.lock().unwrap()).len() != 0 {
+        if !(*error.lock().unwrap()).is_empty() {
             return Err(SimulgineErrors::LinkError(error.into_inner().unwrap()));
         }
     }
@@ -234,7 +226,7 @@ pub fn link_ast(ast: AST) -> std::result::Result<Simulgine, SimulgineErrors> {
             let node = nodes.remove(&a.name).unwrap();
             let f_node = link_field_body(
                 a,
-                classes_map.get(&class.name).unwrap().clone(),
+                *classes_map.get(&class.name).unwrap(),
                 &classes_map,
                 &baked_classes,
                 node,
@@ -248,7 +240,7 @@ pub fn link_ast(ast: AST) -> std::result::Result<Simulgine, SimulgineErrors> {
         baked_nodes.insert(class.name.clone(), f_nodes);
     }
 
-    if (*error.lock().unwrap()).len() != 0 {
+    if !(*error.lock().unwrap()).is_empty() {
         return Err(SimulgineErrors::LinkError(error.into_inner().unwrap()));
     }
 
@@ -277,14 +269,14 @@ pub(crate) struct LinkerInfo<'a> {
 
 fn ast_linking_need_x_unary(
     info: LinkerInfo,
-    astnode_expr: Box<ASTNode>,
+    astnode_expr: ASTNode,
     c: fn(Box<FASTNode>) -> FASTContent,
     x: &[Type],
     variables: &VariableII,
 ) -> Result<FASTNode> {
     let token = astnode_expr.token.clone();
-    let inner = link_ast_node(*astnode_expr, info, variables, x)?;
-    if x.contains(&(&(&inner).ret_type).into()) {
+    let inner = link_ast_node(astnode_expr, info, variables, x)?;
+    if x.contains(&(&(inner).ret_type).into()) {
         Ok(FASTNode {
             ret_type: inner.ret_type.clone(),
             inter_type: inner.ret_type.clone(),
@@ -292,7 +284,7 @@ fn ast_linking_need_x_unary(
         })
     } else {
         Err(ASTLinkError {
-            token,
+            token: Box::new(token),
             err: ASTLinkErrorInner::MismatchedType(inner.ret_type.into(), x.into()),
         })
     }
@@ -300,23 +292,23 @@ fn ast_linking_need_x_unary(
 
 fn ast_linking_need_x_number(
     info: LinkerInfo,
-    astnode_expr: Box<ASTNode>,
-    astnode_expr1: Box<ASTNode>,
+    astnode_expr: ASTNode,
+    astnode_expr1: ASTNode,
     c: fn(Box<FASTNode>, Box<FASTNode>) -> FASTContent,
     x: &[Type],
     variables: &VariableII,
 ) -> Result<FASTNode> {
     let t = astnode_expr.token.clone();
     let t1 = astnode_expr1.token.clone();
-    let inner = link_ast_node(*astnode_expr, info, variables, x)?;
-    let inner1 = link_ast_node(*astnode_expr1, info, variables, x)?;
+    let inner = link_ast_node(astnode_expr, info, variables, x)?;
+    let inner1 = link_ast_node(astnode_expr1, info, variables, x)?;
     let t = if inner.ret_type.is_assignable_from(&inner1.ret_type) {
         inner.ret_type.clone()
     } else if inner1.ret_type.is_assignable_from(&inner.ret_type) {
         inner1.ret_type.clone()
     } else {
         return Err(ASTLinkError {
-            token: t,
+            token: Box::new(t),
             err: ASTLinkErrorInner::UncovertibleTypes(
                 inner.ret_type.into(),
                 inner1.ret_type.into(),
@@ -331,7 +323,7 @@ fn ast_linking_need_x_number(
         })
     } else {
         Err(ASTLinkError {
-            token: t1,
+            token: Box::new(t1),
             err: ASTLinkErrorInner::MismatchedType(t.into(), x.into()),
         })
     }
@@ -339,23 +331,23 @@ fn ast_linking_need_x_number(
 
 fn ast_linking_need_x_compare(
     info: LinkerInfo,
-    astnode_expr: Box<ASTNode>,
-    astnode_expr1: Box<ASTNode>,
+    astnode_expr: ASTNode,
+    astnode_expr1: ASTNode,
     c: fn(Box<FASTNode>, Box<FASTNode>) -> FASTContent,
     x: &[Type],
     variables: &VariableII,
 ) -> Result<FASTNode> {
     let t = astnode_expr.token.clone();
     let t1 = astnode_expr1.token.clone();
-    let inner = link_ast_node(*astnode_expr, info, variables, x)?;
-    let inner1 = link_ast_node(*astnode_expr1, info, variables, x)?;
+    let inner = link_ast_node(astnode_expr, info, variables, x)?;
+    let inner1 = link_ast_node(astnode_expr1, info, variables, x)?;
     let t = if inner.ret_type.is_assignable_from(&inner1.ret_type) {
         inner.ret_type.clone()
     } else if inner1.ret_type.is_assignable_from(&inner.ret_type) {
         inner1.ret_type.clone()
     } else {
         return Err(ASTLinkError {
-            token: t,
+            token: Box::new(t),
             err: ASTLinkErrorInner::UncovertibleTypes(
                 inner.ret_type.into(),
                 inner1.ret_type.into(),
@@ -370,7 +362,7 @@ fn ast_linking_need_x_compare(
         })
     } else {
         Err(ASTLinkError {
-            token: t1,
+            token: Box::new(t1),
             err: ASTLinkErrorInner::MismatchedType(t.into(), x.into()),
         })
     }
@@ -378,7 +370,7 @@ fn ast_linking_need_x_compare(
 
 #[derive(Debug, Clone)]
 pub struct ASTLinkError {
-    token: Token,
+    token: Box<Token>,
     err: ASTLinkErrorInner,
 }
 
@@ -400,10 +392,7 @@ pub enum ASTLinkErrorInner {
 
 impl std::fmt::Display for ASTLinkError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let res = write!(f, "In Token: {:#?}", &self.token);
-        if res.is_err() {
-            return res;
-        }
+        write!(f, "In Token: {:#?}", &self.token)?;
         match &self.err {
             ASTLinkErrorInner::MismatchedType(t, items) => {
                 write!(f, "Expected one of types {:#?}, but got {:#?}", items, t)
@@ -468,9 +457,11 @@ pub fn link_ast_node(
     let ret = match node.inner {
         ASTNodeInner::Integer(x) => {
             #[rustfmt::skip]
+            #[allow(clippy::absurd_extreme_comparisons)]
+            #[allow(clippy::manual_range_contains)]
             let t = exp_type
                 .iter()
-                .filter(|a| match a {
+                .find(|a| match a {
                     Type::I64 =>    i64::MIN        <= x        &&  x        <= i64::MAX,
                     Type::I32 =>    i32::MIN as i64 <= x        &&  x        <= i32::MAX as i64,
                     Type::I16 =>    i16::MIN as i64 <= x        &&  x        <= i16::MAX as i64,
@@ -481,9 +472,8 @@ pub fn link_ast_node(
                     Type::U8  =>    u8::MIN  as u64 <= x as u64 &&  x as u64 <= u8::MAX  as u64,
                     _ => false,
                 })
-                .next()
                 .ok_or(ASTLinkError{
-                    token: node.token,
+                    token: Box::new(node.token),
                     err: ASTLinkErrorInner::MismatchedTypes(exp_type.into(), INTEGER_NUMBERS.clone().into())
                 })?;
 
@@ -495,16 +485,16 @@ pub fn link_ast_node(
         }
         ASTNodeInner::Decimal(x) => {
             #[rustfmt::skip]
+            #[allow(clippy::manual_range_contains)]
             let t = exp_type
                 .iter()
-                .filter(|a| match a {
+                .find(|a| match a {
                     Type::Double => f64::MIN        <= Into::<f64>::into(x)        &&  Into::<f64>::into(x)        <= f64::MAX,
-                    Type::Float  => f32::MIN as f32 <= Into::<f64>::into(x) as f32 &&  Into::<f64>::into(x) as f32 <= f32::MAX as f32,
+                    Type::Float  => f32::MIN        <= Into::<f64>::into(x) as f32 &&  Into::<f64>::into(x) as f32 <= f32::MAX       ,
                     _ => false,
                 })
-                .next()
                 .ok_or(ASTLinkError{
-                    token: node.token,
+                    token: Box::new(node.token),
                     err: ASTLinkErrorInner::MismatchedTypes(exp_type.into(), FLOATING_NUMBERS.clone().into())
                 })?;
 
@@ -531,14 +521,14 @@ pub fn link_ast_node(
         }),
         ASTNodeInner::Negate(astnode_expr) => ast_linking_need_x_unary(
             info,
-            astnode_expr,
+            *astnode_expr,
             FASTContent::Negate,
             &SIGNED_NUMBERS,
             variables,
         ),
         ASTNodeInner::Not(astnode_expr) => ast_linking_need_x_unary(
             info,
-            astnode_expr,
+            *astnode_expr,
             FASTContent::Not,
             &[Type::Boolean],
             variables,
@@ -546,21 +536,21 @@ pub fn link_ast_node(
         ASTNodeInner::Variable(astvar_ref) => {
             if (variables.len() as u8 - astvar_ref.indx_up) < 1 {
                 return Err(ASTLinkError {
-                    token,
+                    token: Box::new(token),
                     err: ASTLinkErrorInner::NonexistentVariable,
                 });
             }
             let var = variables.get((variables.len() as u8 - astvar_ref.indx_up) as usize - 1);
-            if let None = var {
+            if var.is_none() {
                 return Err(ASTLinkError {
-                    token,
+                    token: Box::new(token),
                     err: ASTLinkErrorInner::NonexistentVariable,
                 });
             }
             let var = var.unwrap().get(astvar_ref.indx as usize);
-            if let None = var {
+            if var.is_none() {
                 return Err(ASTLinkError {
-                    token,
+                    token: Box::new(token),
                     err: ASTLinkErrorInner::NonexistentVariable,
                 });
             }
@@ -594,7 +584,7 @@ pub fn link_ast_node(
                 })
             } else {
                 Err(ASTLinkError {
-                    token: node.token,
+                    token: Box::new(node.token),
                     err: ASTLinkErrorInner::MismatchedType(
                         inner.ret_type.into(),
                         Box::new([Type::Type]),
@@ -613,15 +603,15 @@ pub fn link_ast_node(
             };
 
             if x.to_lowercase().as_str() == "root" {
-                let root = find_type("ROOT", &info.classes_map).unwrap();
+                let root = find_type("ROOT", info.classes_map).unwrap();
                 return Ok(FASTNode {
-                    node: FASTContent::Reference(FASTReference::ROOT),
+                    node: FASTContent::Reference(FASTReference::Root),
                     ret_type: root.clone(),
                     inter_type: root,
                 });
             }
 
-            let t = find_type(x, &info.classes_map);
+            let t = find_type(x, info.classes_map);
 
             match t {
                 Some(x) => Ok(FASTNode {
@@ -630,7 +620,7 @@ pub fn link_ast_node(
                     ret_type: TypeIdentifier::Type(Box::new(x)),
                 }),
                 None => Err(ASTLinkError {
-                    token: node.token,
+                    token: Box::new(node.token),
                     err: ASTLinkErrorInner::NonexistentVT(x.clone()),
                 }),
             }
@@ -652,7 +642,7 @@ pub fn link_ast_node(
                 })
             } else {
                 Err(ASTLinkError {
-                    token: node.token,
+                    token: Box::new(node.token),
                     err: ASTLinkErrorInner::UncovertibleTypes(
                         var.t.clone().into(),
                         expr.ret_type.into(),
@@ -662,32 +652,32 @@ pub fn link_ast_node(
         }
         ASTNodeInner::Add(astnode_expr, astnode_expr1) => ast_linking_need_x_number(
             info,
-            astnode_expr,
-            astnode_expr1,
+            *astnode_expr,
+            *astnode_expr1,
             FASTContent::Add,
             &NUMBERS,
             variables,
         ),
         ASTNodeInner::Subtract(astnode_expr, astnode_expr1) => ast_linking_need_x_number(
             info,
-            astnode_expr,
-            astnode_expr1,
+            *astnode_expr,
+            *astnode_expr1,
             FASTContent::Subtract,
             &NUMBERS,
             variables,
         ),
         ASTNodeInner::Multiply(astnode_expr, astnode_expr1) => ast_linking_need_x_number(
             info,
-            astnode_expr,
-            astnode_expr1,
+            *astnode_expr,
+            *astnode_expr1,
             FASTContent::Multiply,
             &NUMBERS,
             variables,
         ),
         ASTNodeInner::Divide(astnode_expr, astnode_expr1) => ast_linking_need_x_number(
             info,
-            astnode_expr,
-            astnode_expr1,
+            *astnode_expr,
+            *astnode_expr1,
             FASTContent::Divide,
             &NUMBERS,
             variables,
@@ -698,7 +688,7 @@ pub fn link_ast_node(
 
             if !NUMBERS.contains(&expr1.ret_type.clone().into()) {
                 return Err(ASTLinkError {
-                    token: node.token,
+                    token: Box::new(node.token),
                     err: ASTLinkErrorInner::MismatchedType(
                         expr1.ret_type.clone().into(),
                         Box::new(NUMBERS.clone()),
@@ -708,7 +698,7 @@ pub fn link_ast_node(
 
             if <TypeIdentifier as Into<Type>>::into(expr2.ret_type.clone()) != Type::U32 {
                 return Err(ASTLinkError {
-                    token: node.token,
+                    token: Box::new(node.token),
                     err: ASTLinkErrorInner::MismatchedType(
                         expr2.ret_type.clone().into(),
                         Box::new([Type::U32]),
@@ -717,79 +707,79 @@ pub fn link_ast_node(
             }
 
             Ok(FASTNode {
-                ret_type: expr1.ret_type.clone().into(),
-                inter_type: expr1.ret_type.clone().into(),
+                ret_type: expr1.ret_type.clone(),
+                inter_type: expr1.ret_type.clone(),
                 node: FASTContent::Pow(Box::new(expr1), Box::new(expr2)),
             })
         }
         ASTNodeInner::Modulus(astnode_expr, astnode_expr1) => ast_linking_need_x_number(
             info,
-            astnode_expr,
-            astnode_expr1,
+            *astnode_expr,
+            *astnode_expr1,
             FASTContent::Modulus,
             &NUMBERS,
             variables,
         ),
         ASTNodeInner::Equal(astnode_expr, astnode_expr1) => ast_linking_need_x_compare(
             info,
-            astnode_expr,
-            astnode_expr1,
+            *astnode_expr,
+            *astnode_expr1,
             FASTContent::Equal,
             &EQUALLABLETYPES,
             variables,
         ),
         ASTNodeInner::NotEqual(astnode_expr, astnode_expr1) => ast_linking_need_x_compare(
             info,
-            astnode_expr,
-            astnode_expr1,
+            *astnode_expr,
+            *astnode_expr1,
             FASTContent::NotEqual,
             &EQUALLABLETYPES,
             variables,
         ),
         ASTNodeInner::Greater(astnode_expr, astnode_expr1) => ast_linking_need_x_compare(
             info,
-            astnode_expr,
-            astnode_expr1,
+            *astnode_expr,
+            *astnode_expr1,
             FASTContent::Greater,
             &NUMBERS,
             variables,
         ),
         ASTNodeInner::Lesser(astnode_expr, astnode_expr1) => ast_linking_need_x_compare(
             info,
-            astnode_expr,
-            astnode_expr1,
+            *astnode_expr,
+            *astnode_expr1,
             FASTContent::Lesser,
             &NUMBERS,
             variables,
         ),
         ASTNodeInner::GreaterE(astnode_expr, astnode_expr1) => ast_linking_need_x_compare(
             info,
-            astnode_expr,
-            astnode_expr1,
+            *astnode_expr,
+            *astnode_expr1,
             FASTContent::GreaterE,
             &NUMBERS,
             variables,
         ),
         ASTNodeInner::LesserE(astnode_expr, astnode_expr1) => ast_linking_need_x_compare(
             info,
-            astnode_expr,
-            astnode_expr1,
+            *astnode_expr,
+            *astnode_expr1,
             FASTContent::LesserE,
             &NUMBERS,
             variables,
         ),
         ASTNodeInner::And(astnode_expr, astnode_expr1) => ast_linking_need_x_compare(
             info,
-            astnode_expr,
-            astnode_expr1,
+            *astnode_expr,
+            *astnode_expr1,
             FASTContent::And,
             &[Type::Boolean],
             variables,
         ),
         ASTNodeInner::Or(astnode_expr, astnode_expr1) => ast_linking_need_x_compare(
             info,
-            astnode_expr,
-            astnode_expr1,
+            *astnode_expr,
+            *astnode_expr1,
             FASTContent::Or,
             &[Type::Boolean],
             variables,
@@ -812,7 +802,7 @@ pub fn link_ast_node(
                         let f = &cl.fields[*y];
                         if f.access_level == FieldAccessLevel::Private {
                             return Err(ASTLinkError {
-                                token,
+                                token: Box::new(token),
                                 err: ASTLinkErrorInner::AccessDenied(
                                     cl.name.clone(),
                                     f.name.clone(),
@@ -820,10 +810,10 @@ pub fn link_ast_node(
                             });
                         }
                         if f.access_level == FieldAccessLevel::Protected
-                            && info.cur_class.map_or(false, |x| *x != f.class)
+                            && info.cur_class.is_some_and(|x| *x != f.class)
                         {
                             return Err(ASTLinkError {
-                                token,
+                                token: Box::new(token),
                                 err: ASTLinkErrorInner::AccessDenied(
                                     cl.name.clone(),
                                     f.name.clone(),
@@ -838,7 +828,7 @@ pub fn link_ast_node(
                         })
                     } else {
                         Err(ASTLinkError {
-                            token,
+                            token: Box::new(token),
                             err: ASTLinkErrorInner::NonexistentField(
                                 info.classes[class.0].name.clone(),
                                 str,
@@ -847,7 +837,7 @@ pub fn link_ast_node(
                     }
                 } else {
                     Err(ASTLinkError {
-                        token,
+                        token: Box::new(token),
                         err: ASTLinkErrorInner::MismatchedType(
                             fnode.ret_type.into(),
                             Box::new([Type::UserClass]),
@@ -856,7 +846,7 @@ pub fn link_ast_node(
                 }
             } else {
                 Err(ASTLinkError {
-                    token,
+                    token: Box::new(token),
                     err: ASTLinkErrorInner::MismatchedType(
                         fnode.ret_type.into(),
                         Box::new([Type::UserClass]),
@@ -879,7 +869,7 @@ pub fn link_ast_node(
                             )
                         }
                     };
-                    let t = find_type(ts, &info.classes_map);
+                    let t = find_type(ts, info.classes_map);
 
                     match t {
                         Some(t) => Ok(ASTVariable {
@@ -887,7 +877,7 @@ pub fn link_ast_node(
                             name: x.name.clone(),
                         }),
                         None => Err(ASTLinkError {
-                            token: node.token.clone(),
+                            token: Box::new(node.token.clone()),
                             err: ASTLinkErrorInner::NonexistentVT(ts.clone()),
                         }),
                     }
@@ -904,9 +894,9 @@ pub fn link_ast_node(
                 }
             }
 
-            if block_err.len() > 0 {
+            if !block_err.is_empty() {
                 return Err(ASTLinkError {
-                    token,
+                    token: Box::new(token),
                     err: ASTLinkErrorInner::SubError(block_err),
                 });
             }
@@ -918,7 +908,7 @@ pub fn link_ast_node(
             let exprlen = astblock.exprs.len();
             let mut exprs = Vec::with_capacity(exprlen);
             let last = astblock.exprs.pop().ok_or(ASTLinkError {
-                token: node.token,
+                token: Box::new(node.token),
                 err: ASTLinkErrorInner::EmptyBrace,
             })?;
             let expiter = astblock.exprs.into_iter();
@@ -943,9 +933,9 @@ pub fn link_ast_node(
                 }
             }
 
-            if errors.len() > 0 {
+            if !errors.is_empty() {
                 return Err(ASTLinkError {
-                    token,
+                    token: Box::new(token),
                     err: ASTLinkErrorInner::SubError(errors),
                 });
             }
@@ -953,7 +943,7 @@ pub fn link_ast_node(
             let t = n_exprs.last().map(|x| x.ret_type.clone());
             match t {
                 None => Err(ASTLinkError {
-                    token,
+                    token: Box::new(token),
                     err: ASTLinkErrorInner::EmptyBrace,
                 }),
                 Some(x) => Ok(FASTNode {
@@ -982,7 +972,7 @@ pub fn link_ast_node(
 
             if !TypeIdentifier::Boolean.is_assignable_from(&expr.ret_type) {
                 return Err(ASTLinkError {
-                    token: node.token,
+                    token: Box::new(node.token),
                     err: ASTLinkErrorInner::MismatchedType(
                         expr.ret_type.into(),
                         Box::new([Type::Boolean]),
@@ -1007,7 +997,7 @@ pub fn link_ast_node(
                         })
                     } else {
                         Err(ASTLinkError {
-                            token: node.token,
+                            token: Box::new(node.token),
                             err: ASTLinkErrorInner::UncovertibleTypes(
                                 t.ret_type.into(),
                                 f.ret_type.into(),
@@ -1018,7 +1008,7 @@ pub fn link_ast_node(
             }
         }
         ASTNodeInner::Error => Err(ASTLinkError {
-            token: node.token,
+            token: Box::new(node.token),
             err: ASTLinkErrorInner::ErrorToken,
         }),
     }?;
@@ -1032,7 +1022,7 @@ pub fn link_ast_node(
         Ok(ret)
     } else {
         Err(ASTLinkError {
-            token,
+            token: Box::new(token),
             err: ASTLinkErrorInner::MismatchedType(ret.ret_type.into(), exp_type.into()),
         })
     }

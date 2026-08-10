@@ -1,6 +1,5 @@
 use ordered_float::NotNan;
 use std::io::Read;
-use TokenType::ConstTrue;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum TokenType {
@@ -147,6 +146,7 @@ impl FileScanner {
         }
     }
 
+    #[allow(dead_code)] // Used in currently commented-out tests.
     pub fn synthesize_filescanner<T: Read>(src: &mut T) -> FileScanner {
         let mut u8buf = Vec::new();
         if let Err(x) = src.read_to_end(&mut u8buf) {
@@ -249,10 +249,10 @@ impl FileScanner {
         let val: TokenValue = match t_type {
             TokenType::Integer => String::from_iter(&self.chars[self.start..self.cursor])
                 .parse::<i64>()
-                .map(|x| TokenValue::I64(x))?,
+                .map(TokenValue::I64)?,
             TokenType::Decimal => String::from_iter(&self.chars[self.start..self.cursor])
                 .parse::<NotNan<f64>>()
-                .map(|x| TokenValue::Double(x))?,
+                .map(TokenValue::Double)?,
             _ => TokenValue::None,
         };
         Ok(Token {
@@ -400,6 +400,7 @@ impl FileScanner {
         }
         self.start = self.cursor;
         self.column_s = self.column;
+        #[allow(clippy::manual_map)]
         match self.advance() {
             Some(x) => Some(match *x {
                 '"' => self.parse_string('"'),

@@ -43,14 +43,14 @@ pub struct UserClass {
 impl UserClass {
     pub fn to_debug_string(&self, sim: &Simulgine) -> String {
         let mut buf = BufWriter::new(Vec::new());
-        buf.write(self.name.as_bytes()).unwrap();
-        buf.write(" {\n".as_bytes()).unwrap();
+        buf.write_all(self.name.as_bytes()).unwrap();
+        buf.write_all(" {\n".as_bytes()).unwrap();
 
         for f in &self.fields {
-            write!(buf, "\t{}: {}\n", f.name, f.t.to_debug_string(sim)).unwrap();
+            writeln!(buf, "\t{}: {}", f.name, f.t.to_debug_string(sim)).unwrap();
         }
 
-        buf.write("}".as_bytes()).unwrap();
+        buf.write_all("}".as_bytes()).unwrap();
 
         String::from_utf8(buf.into_inner().unwrap()).unwrap()
     }
@@ -68,7 +68,7 @@ pub struct Simulgine {
 
 impl Simulgine {
     pub fn get_user_class(&self, i: UserClassIndx) -> Option<&UserClass> {
-        return self.user_classes.get(i.0);
+        self.user_classes.get(i.0)
     }
 }
 
@@ -106,15 +106,15 @@ impl UserObject {
 
         if let Some(class) = cl {
             let mut buf = BufWriter::new(Vec::new());
-            buf.write(class.name.as_bytes()).unwrap();
-            buf.write(" {\n".as_bytes()).unwrap();
+            buf.write_all(class.name.as_bytes()).unwrap();
+            buf.write_all(" {\n".as_bytes()).unwrap();
 
             let mut i: usize = 0;
             while i < self.fields.len() {
                 let f = &class.fields[i];
-                write!(
+                writeln!(
                     buf,
-                    "\t{}: {} = {}\n",
+                    "\t{}: {} = {}",
                     f.name,
                     f.t.to_string(sim),
                     self.fields[i].to_string(sim),
@@ -123,7 +123,7 @@ impl UserObject {
                 i += 1;
             }
 
-            buf.write("}".as_bytes()).unwrap();
+            buf.write_all("}".as_bytes()).unwrap();
 
             String::from_utf8(buf.into_inner().unwrap()).unwrap()
         } else {

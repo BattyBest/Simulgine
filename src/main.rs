@@ -66,7 +66,7 @@ fn tui(mut sim: SimulgineInst) {
             continue;
         }
 
-        let expres = run_free_expression(&sim, &inp);
+        let expres = run_free_expression(&sim, inp);
 
         match expres {
             Ok(x) => println!("{}", x.to_debug_string(sim.based)),
