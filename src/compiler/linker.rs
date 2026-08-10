@@ -71,9 +71,11 @@ fn link_field_body(
         assert_eq!(f.change_level, FieldChangeLevel::Volatile);
         match link_ast_node(
             x,
-            user_classes_map,
-            Some(&parent),
-            user_classes,
+            LinkerInfo {
+                classes_map: user_classes_map,
+                cur_class: Some(&parent),
+                classes: user_classes,
+            },
             &[&[
                 &ASTVariable {
                     t: f.t.clone(),
@@ -266,17 +268,22 @@ pub fn link_ast(ast: AST) -> std::result::Result<Simulgine, SimulgineErrors> {
 type Result<T> = std::result::Result<T, ASTLinkError>;
 type VariableII<'a, 'b> = [&'a [&'b ASTVariable]];
 
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct LinkerInfo<'a> {
+    pub(crate) classes_map: &'a HashMap<String, UserClassIndx>,
+    pub(crate) cur_class: Option<&'a UserClassIndx>,
+    pub(crate) classes: &'a [UserClass],
+}
+
 fn ast_linking_need_x_unary(
-    classes_map: &HashMap<String, UserClassIndx>,
-    cur_class: Option<&UserClassIndx>,
-    classes: &[UserClass],
+    info: LinkerInfo,
     astnode_expr: Box<ASTNode>,
     c: fn(Box<FASTNode>) -> FASTContent,
     x: &[Type],
     variables: &VariableII,
 ) -> Result<FASTNode> {
     let token = astnode_expr.token.clone();
-    let inner = link_ast_node(*astnode_expr, classes_map, cur_class, classes, variables, x)?;
+    let inner = link_ast_node(*astnode_expr, info, variables, x)?;
     if x.contains(&(&(&inner).ret_type).into()) {
         Ok(FASTNode {
             ret_type: inner.ret_type.clone(),
@@ -292,9 +299,7 @@ fn ast_linking_need_x_unary(
 }
 
 fn ast_linking_need_x_number(
-    classes_map: &HashMap<String, UserClassIndx>,
-    cur_class: Option<&UserClassIndx>,
-    classes: &[UserClass],
+    info: LinkerInfo,
     astnode_expr: Box<ASTNode>,
     astnode_expr1: Box<ASTNode>,
     c: fn(Box<FASTNode>, Box<FASTNode>) -> FASTContent,
@@ -303,15 +308,8 @@ fn ast_linking_need_x_number(
 ) -> Result<FASTNode> {
     let t = astnode_expr.token.clone();
     let t1 = astnode_expr1.token.clone();
-    let inner = link_ast_node(*astnode_expr, classes_map, cur_class, classes, variables, x)?;
-    let inner1 = link_ast_node(
-        *astnode_expr1,
-        classes_map,
-        cur_class,
-        classes,
-        variables,
-        x,
-    )?;
+    let inner = link_ast_node(*astnode_expr, info, variables, x)?;
+    let inner1 = link_ast_node(*astnode_expr1, info, variables, x)?;
     let t = if inner.ret_type.is_assignable_from(&inner1.ret_type) {
         inner.ret_type.clone()
     } else if inner1.ret_type.is_assignable_from(&inner.ret_type) {
@@ -340,9 +338,7 @@ fn ast_linking_need_x_number(
 }
 
 fn ast_linking_need_x_compare(
-    classes_map: &HashMap<String, UserClassIndx>,
-    cur_class: Option<&UserClassIndx>,
-    classes: &[UserClass],
+    info: LinkerInfo,
     astnode_expr: Box<ASTNode>,
     astnode_expr1: Box<ASTNode>,
     c: fn(Box<FASTNode>, Box<FASTNode>) -> FASTContent,
@@ -351,15 +347,8 @@ fn ast_linking_need_x_compare(
 ) -> Result<FASTNode> {
     let t = astnode_expr.token.clone();
     let t1 = astnode_expr1.token.clone();
-    let inner = link_ast_node(*astnode_expr, classes_map, cur_class, classes, variables, x)?;
-    let inner1 = link_ast_node(
-        *astnode_expr1,
-        classes_map,
-        cur_class,
-        classes,
-        variables,
-        x,
-    )?;
+    let inner = link_ast_node(*astnode_expr, info, variables, x)?;
+    let inner1 = link_ast_node(*astnode_expr1, info, variables, x)?;
     let t = if inner.ret_type.is_assignable_from(&inner1.ret_type) {
         inner.ret_type.clone()
     } else if inner1.ret_type.is_assignable_from(&inner.ret_type) {
@@ -471,9 +460,7 @@ impl std::error::Error for ASTLinkError {}
 
 pub fn link_ast_node(
     node: ASTNode,
-    classes_map: &HashMap<String, UserClassIndx>,
-    cur_class: Option<&UserClassIndx>,
-    classes: &[UserClass],
+    info: LinkerInfo,
     variables: &VariableII,
     exp_type: &[Type],
 ) -> Result<FASTNode> {
@@ -543,18 +530,14 @@ pub fn link_ast_node(
             inter_type: TypeIdentifier::Boolean,
         }),
         ASTNodeInner::Negate(astnode_expr) => ast_linking_need_x_unary(
-            classes_map,
-            cur_class,
-            classes,
+            info,
             astnode_expr,
             FASTContent::Negate,
             &SIGNED_NUMBERS,
             variables,
         ),
         ASTNodeInner::Not(astnode_expr) => ast_linking_need_x_unary(
-            classes_map,
-            cur_class,
-            classes,
+            info,
             astnode_expr,
             FASTContent::Not,
             &[Type::Boolean],
@@ -592,14 +575,7 @@ pub fn link_ast_node(
             })
         }
         ASTNodeInner::Typeof(astnode_expr) => {
-            let inner = link_ast_node(
-                *astnode_expr,
-                classes_map,
-                cur_class,
-                classes,
-                variables,
-                exp_type,
-            )?;
+            let inner = link_ast_node(*astnode_expr, info, variables, exp_type)?;
             let t = TypeIdentifier::Type(Box::new(inner.ret_type.clone()));
 
             Ok(FASTNode {
@@ -609,14 +585,7 @@ pub fn link_ast_node(
             })
         }
         ASTNodeInner::Instanceof(astnode_expr) => {
-            let inner = link_ast_node(
-                *astnode_expr,
-                classes_map,
-                cur_class,
-                classes,
-                variables,
-                exp_type,
-            )?;
+            let inner = link_ast_node(*astnode_expr, info, variables, exp_type)?;
             if let TypeIdentifier::Type(x) = inner.ret_type.clone() {
                 Ok(FASTNode {
                     node: FASTContent::Instanceof(Box::new(inner)),
@@ -644,7 +613,7 @@ pub fn link_ast_node(
             };
 
             if x.to_lowercase().as_str() == "root" {
-                let root = find_type("ROOT", &classes_map).unwrap();
+                let root = find_type("ROOT", &info.classes_map).unwrap();
                 return Ok(FASTNode {
                     node: FASTContent::Reference(FASTReference::ROOT),
                     ret_type: root.clone(),
@@ -652,7 +621,7 @@ pub fn link_ast_node(
                 });
             }
 
-            let t = find_type(x, &classes_map);
+            let t = find_type(x, &info.classes_map);
 
             match t {
                 Some(x) => Ok(FASTNode {
@@ -673,14 +642,7 @@ pub fn link_ast_node(
                 .get(astvar_ref.indx as usize)
                 .unwrap();
 
-            let expr = link_ast_node(
-                *astnode_expr1,
-                classes_map,
-                cur_class,
-                classes,
-                variables,
-                &[var.t.clone().into()],
-            )?;
+            let expr = link_ast_node(*astnode_expr1, info, variables, &[var.t.clone().into()])?;
 
             if var.t.is_assignable_from(&expr.ret_type) {
                 Ok(FASTNode {
@@ -699,9 +661,7 @@ pub fn link_ast_node(
             }
         }
         ASTNodeInner::Add(astnode_expr, astnode_expr1) => ast_linking_need_x_number(
-            classes_map,
-            cur_class,
-            classes,
+            info,
             astnode_expr,
             astnode_expr1,
             FASTContent::Add,
@@ -709,9 +669,7 @@ pub fn link_ast_node(
             variables,
         ),
         ASTNodeInner::Subtract(astnode_expr, astnode_expr1) => ast_linking_need_x_number(
-            classes_map,
-            cur_class,
-            classes,
+            info,
             astnode_expr,
             astnode_expr1,
             FASTContent::Subtract,
@@ -719,9 +677,7 @@ pub fn link_ast_node(
             variables,
         ),
         ASTNodeInner::Multiply(astnode_expr, astnode_expr1) => ast_linking_need_x_number(
-            classes_map,
-            cur_class,
-            classes,
+            info,
             astnode_expr,
             astnode_expr1,
             FASTContent::Multiply,
@@ -729,9 +685,7 @@ pub fn link_ast_node(
             variables,
         ),
         ASTNodeInner::Divide(astnode_expr, astnode_expr1) => ast_linking_need_x_number(
-            classes_map,
-            cur_class,
-            classes,
+            info,
             astnode_expr,
             astnode_expr1,
             FASTContent::Divide,
@@ -739,22 +693,8 @@ pub fn link_ast_node(
             variables,
         ),
         ASTNodeInner::Pow(astnode_expr, astnode_expr1) => {
-            let expr1 = link_ast_node(
-                *astnode_expr,
-                classes_map,
-                cur_class,
-                classes,
-                variables,
-                &NUMBERS,
-            )?;
-            let expr2 = link_ast_node(
-                *astnode_expr1,
-                classes_map,
-                cur_class,
-                classes,
-                variables,
-                &NUMBERS,
-            )?;
+            let expr1 = link_ast_node(*astnode_expr, info, variables, &NUMBERS)?;
+            let expr2 = link_ast_node(*astnode_expr1, info, variables, &NUMBERS)?;
 
             if !NUMBERS.contains(&expr1.ret_type.clone().into()) {
                 return Err(ASTLinkError {
@@ -783,9 +723,7 @@ pub fn link_ast_node(
             })
         }
         ASTNodeInner::Modulus(astnode_expr, astnode_expr1) => ast_linking_need_x_number(
-            classes_map,
-            cur_class,
-            classes,
+            info,
             astnode_expr,
             astnode_expr1,
             FASTContent::Modulus,
@@ -793,9 +731,7 @@ pub fn link_ast_node(
             variables,
         ),
         ASTNodeInner::Equal(astnode_expr, astnode_expr1) => ast_linking_need_x_compare(
-            classes_map,
-            cur_class,
-            classes,
+            info,
             astnode_expr,
             astnode_expr1,
             FASTContent::Equal,
@@ -803,9 +739,7 @@ pub fn link_ast_node(
             variables,
         ),
         ASTNodeInner::NotEqual(astnode_expr, astnode_expr1) => ast_linking_need_x_compare(
-            classes_map,
-            cur_class,
-            classes,
+            info,
             astnode_expr,
             astnode_expr1,
             FASTContent::NotEqual,
@@ -813,9 +747,7 @@ pub fn link_ast_node(
             variables,
         ),
         ASTNodeInner::Greater(astnode_expr, astnode_expr1) => ast_linking_need_x_compare(
-            classes_map,
-            cur_class,
-            classes,
+            info,
             astnode_expr,
             astnode_expr1,
             FASTContent::Greater,
@@ -823,9 +755,7 @@ pub fn link_ast_node(
             variables,
         ),
         ASTNodeInner::Lesser(astnode_expr, astnode_expr1) => ast_linking_need_x_compare(
-            classes_map,
-            cur_class,
-            classes,
+            info,
             astnode_expr,
             astnode_expr1,
             FASTContent::Lesser,
@@ -833,9 +763,7 @@ pub fn link_ast_node(
             variables,
         ),
         ASTNodeInner::GreaterE(astnode_expr, astnode_expr1) => ast_linking_need_x_compare(
-            classes_map,
-            cur_class,
-            classes,
+            info,
             astnode_expr,
             astnode_expr1,
             FASTContent::GreaterE,
@@ -843,9 +771,7 @@ pub fn link_ast_node(
             variables,
         ),
         ASTNodeInner::LesserE(astnode_expr, astnode_expr1) => ast_linking_need_x_compare(
-            classes_map,
-            cur_class,
-            classes,
+            info,
             astnode_expr,
             astnode_expr1,
             FASTContent::LesserE,
@@ -853,9 +779,7 @@ pub fn link_ast_node(
             variables,
         ),
         ASTNodeInner::And(astnode_expr, astnode_expr1) => ast_linking_need_x_compare(
-            classes_map,
-            cur_class,
-            classes,
+            info,
             astnode_expr,
             astnode_expr1,
             FASTContent::And,
@@ -863,9 +787,7 @@ pub fn link_ast_node(
             variables,
         ),
         ASTNodeInner::Or(astnode_expr, astnode_expr1) => ast_linking_need_x_compare(
-            classes_map,
-            cur_class,
-            classes,
+            info,
             astnode_expr,
             astnode_expr1,
             FASTContent::Or,
@@ -874,14 +796,7 @@ pub fn link_ast_node(
         ),
         ASTNodeInner::Inner(node, str) => {
             let token = node.token.clone();
-            let mut fnode = link_ast_node(
-                *node,
-                classes_map,
-                cur_class,
-                classes,
-                variables,
-                &[Type::UserClass],
-            )?;
+            let mut fnode = link_ast_node(*node, info, variables, &[Type::UserClass])?;
             if let FASTContent::Variable(x) = fnode.node {
                 fnode = FASTNode {
                     node: FASTContent::Reference(FASTReference::Variable(x)),
@@ -891,7 +806,7 @@ pub fn link_ast_node(
             }
             if let FASTContent::Reference(x) = fnode.node {
                 if let TypeIdentifier::UserClass(class) = fnode.ret_type {
-                    let cl = classes.get(class.0).unwrap();
+                    let cl = info.classes.get(class.0).unwrap();
                     let f = cl.field_names.get(&str);
                     if let Some(y) = f {
                         let f = &cl.fields[*y];
@@ -905,7 +820,7 @@ pub fn link_ast_node(
                             });
                         }
                         if f.access_level == FieldAccessLevel::Protected
-                            && cur_class.map_or(false, |x| *x != f.class)
+                            && info.cur_class.map_or(false, |x| *x != f.class)
                         {
                             return Err(ASTLinkError {
                                 token,
@@ -925,7 +840,7 @@ pub fn link_ast_node(
                         Err(ASTLinkError {
                             token,
                             err: ASTLinkErrorInner::NonexistentField(
-                                classes[class.0].name.clone(),
+                                info.classes[class.0].name.clone(),
                                 str,
                             ),
                         })
@@ -964,7 +879,7 @@ pub fn link_ast_node(
                             )
                         }
                     };
-                    let t = find_type(ts, &classes_map);
+                    let t = find_type(ts, &info.classes_map);
 
                     match t {
                         Some(t) => Ok(ASTVariable {
@@ -1008,11 +923,11 @@ pub fn link_ast_node(
             })?;
             let expiter = astblock.exprs.into_iter();
             for x in expiter {
-                let n_node = link_ast_node(x, classes_map, cur_class, classes, &n_vars, &TYPES);
+                let n_node = link_ast_node(x, info, &n_vars, &TYPES);
                 exprs.push(n_node);
             }
 
-            let n_node = link_ast_node(last, classes_map, cur_class, classes, &n_vars, exp_type);
+            let n_node = link_ast_node(last, info, &n_vars, exp_type);
             exprs.push(n_node);
 
             let mut errors = vec![];
@@ -1052,19 +967,10 @@ pub fn link_ast_node(
             }
         }
         ASTNodeInner::If(astnode_expr, astnode_expr1, astnode_expr2) => {
-            let expr = link_ast_node(
-                *astnode_expr,
-                classes_map,
-                cur_class,
-                classes,
-                variables,
-                &[Type::Boolean],
-            )?;
+            let expr = link_ast_node(*astnode_expr, info, variables, &[Type::Boolean])?;
             let t = link_ast_node(
                 *astnode_expr1,
-                classes_map,
-                cur_class,
-                classes,
+                info,
                 variables,
                 if astnode_expr2.is_none() {
                     &TYPES
@@ -1072,8 +978,7 @@ pub fn link_ast_node(
                     exp_type
                 },
             )?;
-            let f = astnode_expr2
-                .map(|x| link_ast_node(*x, classes_map, cur_class, classes, variables, exp_type));
+            let f = astnode_expr2.map(|x| link_ast_node(*x, info, variables, exp_type));
 
             if !TypeIdentifier::Boolean.is_assignable_from(&expr.ret_type) {
                 return Err(ASTLinkError {

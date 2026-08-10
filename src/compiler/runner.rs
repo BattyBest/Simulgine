@@ -13,7 +13,7 @@ use crate::compiler::ast::*;
 use super::{
     ast::TypeReference,
     astbuilder::{build_ast, build_free_expr},
-    linker::{link_ast, link_ast_node, ASTLinkError},
+    linker::{link_ast, link_ast_node, ASTLinkError, LinkerInfo},
     scanner::FileScanner,
     simulgine_inst::{
         spawn_type_instance, Simulgine, SimulgineInst, UserClass, UserClassMember, UserObject,
@@ -594,9 +594,11 @@ pub fn run_free_expression<'a>(
 
     let fast = link_ast_node(
         parse,
-        &sim.based.user_class_names,
-        None,
-        &sim.based.user_classes,
+        LinkerInfo {
+            classes_map: &sim.based.user_class_names,
+            cur_class: None,
+            classes: &sim.based.user_classes,
+        },
         &variables,
         &TYPES,
     )?;
