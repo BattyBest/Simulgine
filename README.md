@@ -130,6 +130,16 @@ And also three volatility modifiers:
 
 Access and volatility modifiers come before the type, and in that order.
 
+Const and level fields do not have a body. Where the body would go, goes the
+initializer.
+
+```test_projects/const_field```
+```Simulgine
+class ROOT {
+    const u8 three 3;
+}
+```
+
 ### Initializers
 
 Fields can be initialized with an expression running in a **const-context**.
