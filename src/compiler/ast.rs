@@ -253,20 +253,30 @@ impl TypeIdentifier {
         }
     }
 
-    pub fn to_debug_string(&self, sim: &Simulgine) -> String {
+    pub fn to_debug_string(&self, sim: Option<&Simulgine>) -> String {
         match self {
-            TypeIdentifier::UserClass(user_class_indx) => sim
-                .get_user_class(*user_class_indx)
-                .map_or("<invalid>".to_owned(), |x| x.to_debug_string(sim)),
+            TypeIdentifier::UserClass(user_class_indx) => {
+                if let Some(sim) = sim {
+                    sim.get_user_class(*user_class_indx)
+                        .map_or("<invalid>".to_owned(), |x| x.to_debug_string(sim))
+                } else {
+                    "<invalid>".to_owned()
+                }
+            }
             _ => self.to_string(sim),
         }
     }
 
-    pub fn to_string(&self, sim: &Simulgine) -> String {
+    pub fn to_string(&self, sim: Option<&Simulgine>) -> String {
         match self {
-            TypeIdentifier::UserClass(user_class_indx) => sim
-                .get_user_class(*user_class_indx)
-                .map_or("<invalid>".to_owned(), |x| x.to_string(sim)),
+            TypeIdentifier::UserClass(user_class_indx) => {
+                if let Some(sim) = sim {
+                    sim.get_user_class(*user_class_indx)
+                        .map_or("<invalid>".to_owned(), |x| x.to_string(sim))
+                } else {
+                    "<invalid>".to_owned()
+                }
+            }
             TypeIdentifier::UnlinkedType(_) => "<unlinked>".into(),
             TypeIdentifier::Type(type_identifier) => {
                 format!("Type({})", type_identifier.to_string(sim))
@@ -613,9 +623,11 @@ impl TypeInstance {
         }
     }
 
-    pub fn to_debug_string(&self, sim: &Simulgine) -> String {
+    pub fn to_debug_string(&self, sim: Option<&Simulgine>) -> String {
         let inner = match self {
-            TypeInstance::UserClass(user_class_inst) => user_class_inst.val.to_debug_string(sim),
+            TypeInstance::UserClass(user_class_inst) => sim.map_or("<invalid>".to_owned(), |sim| {
+                user_class_inst.val.to_debug_string(sim)
+            }),
             TypeInstance::Type(type_inst) => type_inst.val.to_debug_string(sim),
             _ => self.to_string(sim),
         };
@@ -625,9 +637,11 @@ impl TypeInstance {
         format!("[{}] {}", type_str, inner)
     }
 
-    pub fn to_string(&self, sim: &Simulgine) -> String {
+    pub fn to_string(&self, sim: Option<&Simulgine>) -> String {
         match self {
-            TypeInstance::UserClass(user_class_inst) => user_class_inst.val.to_string(sim),
+            TypeInstance::UserClass(user_class_inst) => sim.map_or("<invalid>".to_owned(), |sim| {
+                user_class_inst.val.to_string(sim)
+            }),
             TypeInstance::Type(type_inst) => type_inst.val.to_string(sim),
             TypeInstance::I64(i64_inst) => i64_inst.val.to_string(),
             TypeInstance::I32(i32_inst) => i32_inst.val.to_string(),
@@ -687,12 +701,13 @@ impl TypeReference<'_> {
         }
     }
 
-    pub fn to_debug_string(&self, sim: &Simulgine) -> String {
+    pub fn to_debug_string(&self, sim: Option<&Simulgine>) -> String {
         let inner = match self {
             TypeReference::Instance(type_instance) => return type_instance.to_debug_string(sim),
-            TypeReference::UserClassRO(user_class_roinst) => {
-                user_class_roinst.val.to_debug_string(sim)
-            }
+            TypeReference::UserClassRO(user_class_roinst) => sim
+                .map_or("<invalid>".to_owned(), |sim| {
+                    user_class_roinst.val.to_debug_string(sim)
+                }),
         };
 
         let type_str = TypeReference::as_type_identifier(self).to_string(sim);
@@ -701,10 +716,13 @@ impl TypeReference<'_> {
     }
 
     #[allow(dead_code)] // Here for throughness sake.
-    pub fn to_string(&self, sim: &Simulgine) -> String {
+    pub fn to_string(&self, sim: Option<&Simulgine>) -> String {
         match self {
             TypeReference::Instance(type_instance) => type_instance.to_string(sim),
-            TypeReference::UserClassRO(user_class_roinst) => user_class_roinst.val.to_string(sim),
+            TypeReference::UserClassRO(user_class_roinst) => sim
+                .map_or("<invalid>".to_owned(), |sim| {
+                    user_class_roinst.val.to_string(sim)
+                }),
         }
     }
 }

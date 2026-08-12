@@ -47,7 +47,7 @@ impl UserClass {
         buf.write_all(" {\n".as_bytes()).unwrap();
 
         for f in &self.fields {
-            writeln!(buf, "\t{}: {}", f.name, f.t.to_debug_string(sim)).unwrap();
+            writeln!(buf, "\t{}: {}", f.name, f.t.to_debug_string(Some(sim))).unwrap();
         }
 
         buf.write_all("}".as_bytes()).unwrap();
@@ -116,8 +116,8 @@ impl UserObject {
                     buf,
                     "\t{}: {} = {}",
                     f.name,
-                    f.t.to_string(sim),
-                    self.fields[i].to_string(sim),
+                    f.t.to_string(Some(sim)),
+                    self.fields[i].to_string(Some(sim)),
                 )
                 .unwrap();
                 i += 1;

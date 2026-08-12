@@ -626,9 +626,7 @@ pub fn run_free_expression<'a>(
     ))
 }
 
-pub fn run_free_const_expression<'a, 'b>(
-    expr: &'a str,
-) -> Result<TypeReference<'b>, SimulgineErrors> {
+pub fn run_free_const_expression<'b>(expr: &str) -> Result<TypeReference<'b>, SimulgineErrors> {
     let fs = FileScanner::synthesize_filescanner_str(expr);
     let parse = build_free_expr(fs).ok_or(SimulgineErrors::ASTErrors)?;
 
