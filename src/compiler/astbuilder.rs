@@ -565,23 +565,20 @@ impl<T: Iterator<Item = Token>> ASTBuilder<T> {
 
         // Body
 
-        let body = if change_level == FieldChangeLevel::Volatile {
-            let ret = Some(self.expression());
+        let mut body = None;
+        let mut initial = None;
+
+        if change_level == FieldChangeLevel::Volatile {
+            body = Some(self.expression());
             assert_eq!(self.blocks.len(), 0);
-            ret
-        } else {
-            None
-        };
-
-        self.consume(TokenType::Terminator);
-
-        // Initial
-        let initial = if self.consume_if(&[TokenType::OperatorAssign]).is_some() {
-            let ret = Some(self.expression());
             self.consume(TokenType::Terminator);
-            ret
-        } else {
-            None
+            if self.consume_if(&[TokenType::OperatorAssign]).is_some() {
+                initial = Some(self.expression());
+                self.consume(TokenType::Terminator);
+            }
+        } else if self.consume_if(&[TokenType::Terminator]).is_none() {
+            initial = Some(self.expression());
+            self.consume(TokenType::Terminator);
         };
 
         // Compose

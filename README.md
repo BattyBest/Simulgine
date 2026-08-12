@@ -130,6 +130,23 @@ And also three volatility modifiers:
 
 Access and volatility modifiers come before the type, and in that order.
 
+### Initializers
+
+Fields can be initialized with an expression running in a **const-context**.
+In a const-context, you cannot access root, any other user-defined class,
+`parent`, or `this`. To actually initialize the field, you must, after the first
+semicolon, add an equals sign and then the expression. Of course, it must end
+with another semicolon.
+
+The following code demonstrates this, setting the counter to start as 2:
+
+```test_projects/initty_field```
+```Simulgine
+class ROOT {
+    u64 counter this + 1; = 2;
+}
+```
+
 ## Braces
 
 You can use curly braces in fields. This may be for purely aesthetics purposes,
