@@ -1,9 +1,12 @@
 [workspace]
 
 [package]
-name = "Simulgine"
+name = "simulgine"
 version = "0.1.0"
 edition = "2021"
+
+[lib]
+name = "simulgine_lib"
 
 [dependencies]
 backtrace-on-stack-overflow = "0.3.0"
