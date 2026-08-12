@@ -8,12 +8,12 @@ use std::{
 
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
-use crate::compiler::ast::*;
+use crate::compiler::{ast::*, simulgine_inst::spawn_type_instance_const};
 
 use super::{
     ast::TypeReference,
     astbuilder::{build_ast, build_free_expr},
-    linker::{link_ast, link_ast_node, ASTLinkError, LinkerInfo},
+    linker::{link_ast, link_ast_node, ASTLinkError, LinkerEnvInfo, LinkerInfo},
     scanner::FileScanner,
     simulgine_inst::{
         spawn_type_instance, Simulgine, SimulgineInst, UserClass, UserClassMember, UserObject,
@@ -78,7 +78,7 @@ pub fn tick_field<'a, 'c, 'd, 'e, 'g>(
     ]);
     assert_eq!(field.change_level, FieldChangeLevel::Volatile);
 
-    match execute_fast_node(field.body.as_ref().unwrap(), &mut context, sim) {
+    match execute_fast_node(field.body.as_ref().unwrap(), &mut context, Some(sim)) {
         TypeReference::Instance(type_instance) => type_instance,
         TypeReference::UserClassRO(_user_class_roinst) => {
             unreachable!("Field body returned reference")
@@ -263,13 +263,19 @@ macro_rules! compare_worker {
 pub(crate) fn resolve_inner_reference<'a, 'b, 'c, 'd, 'e>(
     node: &'a FASTReference,
     context: &'b mut FASTExecContext<'c>,
-    sim: &'d SimulgineInst<'e>,
+    sim: Option<&'d SimulgineInst<'e>>,
 ) -> TypeReference<'d>
 where
     'c: 'd,
 {
     match node {
-        FASTReference::Root => TypeReference::UserClassRO(UserClassROInst { val: &sim.root }),
+        FASTReference::Root => {
+            if let Some(sim) = sim {
+                TypeReference::UserClassRO(UserClassROInst { val: &sim.root })
+            } else {
+                TypeReference::Instance(TypeInstance::None)
+            }
+        }
         FASTReference::Inner(fastreference, s) => {
             let res = resolve_inner_reference(fastreference, context, sim);
             match res {
@@ -297,7 +303,7 @@ where
 pub(crate) fn execute_fast_node<'a, 'b, 'c, 'f>(
     node: &'a FASTNode,
     context: &'b mut FASTExecContext<'c>,
-    sim: &'c SimulgineInst<'f>,
+    sim: Option<&'c SimulgineInst<'f>>, // None == const context
 ) -> TypeReference<'c> {
     match &node.node {
         FASTContent::Variable(astvar_ref) => get_var_val(&*context, astvar_ref.clone()).clone(),
@@ -310,7 +316,13 @@ pub(crate) fn execute_fast_node<'a, 'b, 'c, 'f>(
             let vars = fastblock
                 .variables
                 .iter()
-                .map(|x| TypeReference::Instance(spawn_type_instance(sim.based, &x.t)))
+                .map(|x| {
+                    if let Some(sim) = sim {
+                        TypeReference::Instance(spawn_type_instance(sim.based, &x.t))
+                    } else {
+                        TypeReference::Instance(spawn_type_instance_const(&x.t))
+                    }
+                })
                 .collect();
 
             context.vars.push(vars);
@@ -418,7 +430,11 @@ pub(crate) fn execute_fast_node<'a, 'b, 'c, 'f>(
                 };
 
                 if let TypeInstance::Type(x) = res {
-                    spawn_type_instance(sim.based, &x.val)
+                    if let Some(sim) = sim {
+                        spawn_type_instance(sim.based, &x.val)
+                    } else {
+                        spawn_type_instance_const(&x.val)
+                    }
                 } else {
                     unreachable!("Can only instantiate types.")
                 }
@@ -593,9 +609,11 @@ pub fn run_free_expression<'a>(
     let fast = link_ast_node(
         parse,
         LinkerInfo {
-            classes_map: &sim.based.user_class_names,
-            cur_class: None,
-            classes: &sim.based.user_classes,
+            env: Some(LinkerEnvInfo {
+                classes_map: &sim.based.user_class_names,
+                cur_class: None,
+                classes: &sim.based.user_classes,
+            }),
         },
         variables,
         &TYPES,
@@ -604,7 +622,22 @@ pub fn run_free_expression<'a>(
     Ok(execute_fast_node(
         &fast,
         &mut FASTExecContext { vars: vec![] },
-        sim,
+        Some(sim),
+    ))
+}
+
+pub fn run_free_const_expression<'b>(expr: &str) -> Result<TypeReference<'b>, SimulgineErrors> {
+    let fs = FileScanner::synthesize_filescanner_str(expr);
+    let parse = build_free_expr(fs).ok_or(SimulgineErrors::ASTErrors)?;
+
+    let variables: &[&[&ASTVariable]] = &[];
+
+    let fast = link_ast_node(parse, LinkerInfo { env: None }, variables, &TYPES)?;
+
+    Ok(execute_fast_node(
+        &fast,
+        &mut FASTExecContext { vars: vec![] },
+        None,
     ))
 }
 

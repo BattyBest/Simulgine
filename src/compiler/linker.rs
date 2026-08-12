@@ -13,7 +13,10 @@ use super::{
     simulgine_inst::{Simulgine, UserClass, UserClassIndx, UserClassMember},
 };
 
-fn find_type(str: &str, user_classes: &HashMap<String, UserClassIndx>) -> Option<TypeIdentifier> {
+fn find_type(
+    str: &str,
+    user_classes: Option<&HashMap<String, UserClassIndx>>,
+) -> Option<TypeIdentifier> {
     match str {
         "i64" => Some(TypeIdentifier::I64),
         "i32" => Some(TypeIdentifier::I32),
@@ -27,7 +30,13 @@ fn find_type(str: &str, user_classes: &HashMap<String, UserClassIndx>) -> Option
         "double" => Some(TypeIdentifier::Double),
         "string" => Some(TypeIdentifier::String),
         "bool" => Some(TypeIdentifier::Boolean),
-        _ => Some(TypeIdentifier::UserClass(*user_classes.get(str)?)),
+        _ => {
+            if let Some(user_classes) = user_classes {
+                Some(TypeIdentifier::UserClass(*user_classes.get(str)?))
+            } else {
+                None
+            }
+        }
     }
 }
 
@@ -36,7 +45,7 @@ fn link_field(
     class_name: &str,
     user_classes: &HashMap<String, UserClassIndx>,
 ) -> Result<UserClassMember> {
-    let t = find_type(&f.type_identifier, user_classes);
+    let t = find_type(&f.type_identifier, Some(user_classes));
 
     if let Some(t) = t {
         Ok(UserClassMember {
@@ -72,9 +81,11 @@ fn link_field_body(
         match link_ast_node(
             x,
             LinkerInfo {
-                classes_map: user_classes_map,
-                cur_class: Some(&parent),
-                classes: user_classes,
+                env: Some(LinkerEnvInfo {
+                    classes_map: user_classes_map,
+                    cur_class: Some(&parent),
+                    classes: user_classes,
+                }),
             },
             &[&[
                 &ASTVariable {
@@ -261,10 +272,15 @@ type Result<T> = std::result::Result<T, ASTLinkError>;
 type VariableII<'a, 'b> = [&'a [&'b ASTVariable]];
 
 #[derive(Debug, Clone, Copy)]
-pub(crate) struct LinkerInfo<'a> {
+pub(crate) struct LinkerEnvInfo<'a> {
     pub(crate) classes_map: &'a HashMap<String, UserClassIndx>,
-    pub(crate) cur_class: Option<&'a UserClassIndx>,
+    pub(crate) cur_class: Option<&'a UserClassIndx>, //cur_class is None == REPL context
     pub(crate) classes: &'a [UserClass],
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct LinkerInfo<'a> {
+    pub(crate) env: Option<LinkerEnvInfo<'a>>, // Env is None == Const context
 }
 
 fn ast_linking_need_x_unary(
@@ -384,6 +400,7 @@ pub enum ASTLinkErrorInner {
     SubError(Vec<ASTLinkError>),
     InvalidFieldType(String, String, String),
     AccessDenied(String, String),
+    ConstContextInvalid(String),
     NonexistentVariable,
     Err,
     EmptyBrace,
@@ -436,6 +453,10 @@ impl std::fmt::Display for ASTLinkError {
                 "Can not access field {} of class {} from outside the class due to its access level.",
                 field,
                 class
+                ),
+            ASTLinkErrorInner::ConstContextInvalid(resolve) => write!(f,
+                "Can not find what '{}' is in a const context.",
+                resolve
                 ),
             ASTLinkErrorInner::NonexistentVariable => write!(f, "Tried to access a non-existent variable. You most likely tried using parent or this in the REPL."),
             ASTLinkErrorInner::Err => write!(f, "An error."),
@@ -602,16 +623,28 @@ pub fn link_ast_node(
                 }
             };
 
+            let classes = info.env.map(|x| x.classes_map);
+
             if x.to_lowercase().as_str() == "root" {
-                let root = find_type("ROOT", info.classes_map).unwrap();
-                return Ok(FASTNode {
-                    node: FASTContent::Reference(FASTReference::Root),
-                    ret_type: root.clone(),
-                    inter_type: root,
-                });
+                let root = find_type("ROOT", classes);
+                match root {
+                    Some(x) => {
+                        return Ok(FASTNode {
+                            node: FASTContent::Reference(FASTReference::Root),
+                            ret_type: x.clone(),
+                            inter_type: x,
+                        });
+                    }
+                    None => {
+                        return Err(ASTLinkError {
+                            token: Box::new(token),
+                            err: ASTLinkErrorInner::ConstContextInvalid(x.to_string()),
+                        });
+                    }
+                }
             }
 
-            let t = find_type(x, info.classes_map);
+            let t = find_type(x, classes);
 
             match t {
                 Some(x) => Ok(FASTNode {
@@ -621,7 +654,13 @@ pub fn link_ast_node(
                 }),
                 None => Err(ASTLinkError {
                     token: Box::new(node.token),
-                    err: ASTLinkErrorInner::NonexistentVT(x.clone()),
+                    err: {
+                        if info.env.is_some() {
+                            ASTLinkErrorInner::NonexistentVT(x.clone())
+                        } else {
+                            ASTLinkErrorInner::ConstContextInvalid(x.clone())
+                        }
+                    },
                 }),
             }
         }
@@ -796,6 +835,13 @@ pub fn link_ast_node(
             }
             if let FASTContent::Reference(x) = fnode.node {
                 if let TypeIdentifier::UserClass(class) = fnode.ret_type {
+                    if info.env.is_none() {
+                        return Err(ASTLinkError {
+                            token: Box::new(token),
+                            err: ASTLinkErrorInner::ConstContextInvalid(str.to_string()),
+                        });
+                    }
+                    let info = info.env.unwrap();
                     let cl = info.classes.get(class.0).unwrap();
                     let f = cl.field_names.get(&str);
                     if let Some(y) = f {
@@ -869,7 +915,8 @@ pub fn link_ast_node(
                             )
                         }
                     };
-                    let t = find_type(ts, info.classes_map);
+                    let classes = info.env.map(|x| x.classes_map);
+                    let t = find_type(ts, classes);
 
                     match t {
                         Some(t) => Ok(ASTVariable {

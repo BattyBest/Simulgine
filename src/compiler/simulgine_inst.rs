@@ -47,7 +47,7 @@ impl UserClass {
         buf.write_all(" {\n".as_bytes()).unwrap();
 
         for f in &self.fields {
-            writeln!(buf, "\t{}: {}", f.name, f.t.to_debug_string(sim)).unwrap();
+            writeln!(buf, "\t{}: {}", f.name, f.t.to_debug_string(Some(sim))).unwrap();
         }
 
         buf.write_all("}".as_bytes()).unwrap();
@@ -116,8 +116,8 @@ impl UserObject {
                     buf,
                     "\t{}: {} = {}",
                     f.name,
-                    f.t.to_string(sim),
-                    self.fields[i].to_string(sim),
+                    f.t.to_string(Some(sim)),
+                    self.fields[i].to_string(Some(sim)),
                 )
                 .unwrap();
                 i += 1;
@@ -140,6 +140,30 @@ impl UserObject {
 impl PartialEq for UserObject {
     fn eq(&self, other: &Self) -> bool {
         std::ptr::eq(self, other)
+    }
+}
+
+pub(crate) fn spawn_type_instance_const(t: &TypeIdentifier) -> TypeInstance {
+    match t {
+        TypeIdentifier::UserClass(_) => TypeInstance::None,
+        TypeIdentifier::UnlinkedType(_) => TypeInstance::None,
+        TypeIdentifier::Type(type_identifier) => TypeInstance::Type(TypeInst {
+            val: *(type_identifier.clone()),
+        }),
+        TypeIdentifier::Error => TypeInstance::None,
+        TypeIdentifier::I64 => TypeInstance::I64(I64Inst { val: 0 }),
+        TypeIdentifier::I32 => TypeInstance::I32(I32Inst { val: 0 }),
+        TypeIdentifier::I16 => TypeInstance::I16(I16Inst { val: 0 }),
+        TypeIdentifier::I8 => TypeInstance::I8(I8Inst { val: 0 }),
+        TypeIdentifier::U64 => TypeInstance::U64(U64Inst { val: 0 }),
+        TypeIdentifier::U32 => TypeInstance::U32(U32Inst { val: 0 }),
+        TypeIdentifier::U16 => TypeInstance::U16(U16Inst { val: 0 }),
+        TypeIdentifier::U8 => TypeInstance::U8(U8Inst { val: 0 }),
+        TypeIdentifier::Float => TypeInstance::Float(FloatInst { val: 0.0 }),
+        TypeIdentifier::Double => TypeInstance::Double(DoubleInst { val: 0.0 }),
+        TypeIdentifier::String => TypeInstance::String(StringInst { val: "".to_owned() }),
+        TypeIdentifier::Boolean => TypeInstance::Boolean(BooleanInst { val: false }),
+        TypeIdentifier::None => TypeInstance::None,
     }
 }
 
