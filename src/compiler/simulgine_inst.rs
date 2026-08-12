@@ -6,6 +6,8 @@ use std::{
 };
 
 use super::ast::*;
+use super::fast::*;
+use super::r#type::*;
 
 #[derive(Debug)]
 pub struct UserClassMember {
@@ -63,8 +65,8 @@ impl UserClass {
 
 #[derive(Debug)]
 pub struct Simulgine {
-    pub(super) user_class_names: HashMap<String, UserClassIndx>,
-    pub(super) user_classes: Vec<UserClass>,
+    pub(crate) user_class_names: HashMap<String, UserClassIndx>,
+    pub(crate) user_classes: Vec<UserClass>,
 }
 
 impl Simulgine {
@@ -78,7 +80,7 @@ pub struct UserClassIndx(pub(super) usize);
 
 #[derive(Debug)]
 pub struct SimulgineInst<'a> {
-    pub(crate) based: &'a Simulgine,
+    pub based: &'a Simulgine,
     pub(crate) root: UserObject,
 }
 

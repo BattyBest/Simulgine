@@ -8,6 +8,8 @@ use crate::compiler::scanner::FileScanner;
 
 use super::{
     ast::*,
+    fast::*,
+    r#type::*,
     runner::{execute_fast_node, FASTExecContext, SimulgineErrors},
     scanner::Token,
     simulgine_inst::{

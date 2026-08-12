@@ -8,6 +8,7 @@ use crate::compiler::scanner::FileScanner;
 use super::{
     ast::*,
     pratttable::{get_pratt_entry, PrattEntry},
+    r#type::*,
     scanner::{Token, TokenType, TokenValue},
 };
 
@@ -625,7 +626,7 @@ pub fn build_ast<T: Iterator<Item = Token>>(token_generator: T) -> Option<AST> {
     }
 }
 
-pub(super) fn build_free_expr<T: Iterator<Item = Token>>(token_generator: T) -> Option<ASTNode> {
+pub fn build_free_expr<T: Iterator<Item = Token>>(token_generator: T) -> Option<ASTNode> {
     let mut builder = ASTBuilder::synthesize_astbuilder(token_generator);
 
     let x = builder.expression();

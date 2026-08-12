@@ -8,9 +8,9 @@ type InfixParser<T> = fn(&mut ASTBuilder<T>, ASTNode, Token) -> ASTNode;
 type PrefixParser<T> = fn(&mut ASTBuilder<T>, Token) -> ASTNode;
 
 pub struct PrattEntry<T: Iterator<Item = Token>> {
-    pub precedence: Precedence,
-    pub prefix: Option<PrefixParser<T>>,
-    pub infix: Option<InfixParser<T>>,
+    pub(super) precedence: Precedence,
+    pub(super) prefix: Option<PrefixParser<T>>,
+    pub(super) infix: Option<InfixParser<T>>,
 }
 
 pub const fn get_pratt_entry<T: Iterator<Item = Token>>(token_type: &TokenType) -> PrattEntry<T> {

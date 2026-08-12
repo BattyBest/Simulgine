@@ -11,10 +11,10 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use crate::compiler::{ast::*, simulgine_inst::spawn_type_instance_const};
 
 use super::{
-    ast::TypeReference,
-    astbuilder::{build_ast, build_free_expr},
-    linker::{link_ast, link_ast_node, ASTLinkError, LinkerEnvInfo, LinkerInfo},
-    scanner::FileScanner,
+    astbuilder::build_ast,
+    fast::*,
+    linker::{link_ast, ASTLinkError},
+    r#type::*,
     simulgine_inst::{
         spawn_type_instance, Simulgine, SimulgineInst, UserClass, UserClassMember, UserObject,
     },
@@ -553,26 +553,6 @@ pub(crate) fn execute_fast_node<'a, 'b, 'c, 'f>(
     }
 }
 
-fn parse_all_sml_in_dir(path: &Path) -> Result<Vec<PathBuf>, std::io::Error> {
-    let mut ret: Vec<PathBuf> = Vec::new();
-    for a in path.read_dir()? {
-        let a = a?.path();
-        if a.is_dir() {
-            ret.extend(parse_all_sml_in_dir(&a)?);
-        }
-        if a.is_file()
-            && a.extension()
-                .map(|x| x.to_str().unwrap_or(""))
-                .unwrap_or("")
-                == "sml"
-        {
-            ret.push(a);
-        }
-    }
-
-    Ok(ret)
-}
-
 pub fn compile_directory(path: &Path) -> Result<Simulgine, SimulgineErrors> {
     let to_compile: Vec<PathBuf> = parse_all_sml_in_dir(path)?;
 
@@ -597,55 +577,22 @@ pub fn compile_directory(path: &Path) -> Result<Simulgine, SimulgineErrors> {
     link_ast(AST { root: raw_classes })
 }
 
-pub fn run_free_expression<'a>(
-    sim: &'a SimulgineInst<'_>,
-    expr: &str,
-) -> Result<TypeReference<'a>, SimulgineErrors> {
-    let fs = FileScanner::synthesize_filescanner_str(expr);
-    let parse = build_free_expr(fs).ok_or(SimulgineErrors::ASTErrors)?;
-
-    let variables: &[&[&ASTVariable]] = &[];
-
-    let fast = link_ast_node(
-        parse,
-        LinkerInfo {
-            env: Some(LinkerEnvInfo {
-                classes_map: &sim.based.user_class_names,
-                cur_class: None,
-                classes: &sim.based.user_classes,
-            }),
-        },
-        variables,
-        &TYPES,
-    )?;
-
-    Ok(execute_fast_node(
-        &fast,
-        &mut FASTExecContext { vars: vec![] },
-        Some(sim),
-    ))
-}
-
-pub fn run_free_const_expression<'b>(expr: &str) -> Result<TypeReference<'b>, SimulgineErrors> {
-    let fs = FileScanner::synthesize_filescanner_str(expr);
-    let parse = build_free_expr(fs).ok_or(SimulgineErrors::ASTErrors)?;
-
-    let variables: &[&[&ASTVariable]] = &[];
-
-    let fast = link_ast_node(parse, LinkerInfo { env: None }, variables, &TYPES)?;
-
-    Ok(execute_fast_node(
-        &fast,
-        &mut FASTExecContext { vars: vec![] },
-        None,
-    ))
-}
-
-pub fn run_simulgine(sim: &Simulgine) -> SimulgineInst<'_> {
-    let root = UserObject::spawn_user_object(sim, *sim.user_class_names.get("ROOT").unwrap());
-
-    SimulgineInst {
-        based: sim,
-        root: root.unwrap(),
+fn parse_all_sml_in_dir(path: &Path) -> Result<Vec<PathBuf>, std::io::Error> {
+    let mut ret: Vec<PathBuf> = Vec::new();
+    for a in path.read_dir()? {
+        let a = a?.path();
+        if a.is_dir() {
+            ret.extend(parse_all_sml_in_dir(&a)?);
+        }
+        if a.is_file()
+            && a.extension()
+                .map(|x| x.to_str().unwrap_or(""))
+                .unwrap_or("")
+                == "sml"
+        {
+            ret.push(a);
+        }
     }
+
+    Ok(ret)
 }

@@ -1,15 +1,15 @@
-mod compiler;
 use std::{
     eprintln,
     io::{self, Write},
     path::Path,
 };
 
-use compiler::{
-    runner::{
-        compile_directory, run_free_const_expression, run_free_expression, run_simulgine, tick_sim,
+use simulgine::{
+    compiler::{
+        runner::{compile_directory, tick_sim},
+        simulgine_inst::Simulgine,
     },
-    simulgine_inst::Simulgine,
+    *,
 };
 
 fn main() {
