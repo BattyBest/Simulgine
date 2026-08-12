@@ -573,14 +573,16 @@ impl<T: Iterator<Item = Token>> ASTBuilder<T> {
             None
         };
 
+        self.consume(TokenType::Terminator);
+
         // Initial
         let initial = if self.consume_if(&[TokenType::OperatorAssign]).is_some() {
-            Some(self.expression())
+            let ret = Some(self.expression());
+            self.consume(TokenType::Terminator);
+            ret
         } else {
             None
         };
-
-        self.consume(TokenType::Terminator);
 
         // Compose
 
