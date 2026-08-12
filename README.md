@@ -115,31 +115,6 @@ class ROOT {
 }
 ```
 
-### Access and Volatility modifiers
-
-Fields have three access modifiers:
- - `public`: Can be accessed from any other class.
- - `protected`: Can be accessed from the same class. **Default**.
- - `private`: Cannot be accessed from any other field.
-
-And also three volatility modifiers:
- - `const`: This value never changes except by external code.
- - `level`: For fields that are not instances of a class, same as `const`. For
-    fields that are, the object is ticked when the parent is.
- - `volatile`: The value is recomputed from scratch every tick. **Default**.
-
-Access and volatility modifiers come before the type, and in that order.
-
-Const and level fields do not have a body. Where the body would go, goes the
-initializer.
-
-```test_projects/const_field```
-```Simulgine
-class ROOT {
-    const u8 three 3;
-}
-```
-
 ### Initializers
 
 Fields can be initialized with an expression running in a **const-context**.
@@ -194,6 +169,31 @@ class ROOT {
         };
         "Hello, world!";
     };
+}
+```
+
+### Access and Volatility modifiers
+
+Fields have three access modifiers:
+ - `public`: Can be accessed from any other class.
+ - `protected`: Can be accessed from the same class. **Default**.
+ - `private`: Cannot be accessed from any other field.
+
+And also three volatility modifiers:
+ - `const`: This value never changes except by external code.
+ - `level`: For fields that are not instances of a class, same as `const`. For
+    fields that are, the object is ticked when the parent is.
+ - `volatile`: The value is recomputed from scratch every tick. **Default**.
+
+Access and volatility modifiers come before the type, and in that order.
+
+Const and level fields do not have a body. Where the body would go, goes the
+initializer.
+
+```test_projects/const_field```
+```Simulgine
+class ROOT {
+    const u8 three 3;
 }
 ```
 
