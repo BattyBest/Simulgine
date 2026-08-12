@@ -1,5 +1,8 @@
 # Simulgine
 
+[![Coverage Status](https://coveralls.io/repos/github/BattyBest/Simulgine/badge.svg?branch=main)](https://coveralls.io/github/BattyBest/Simulgine?branch=main)
+[![Rust](https://github.com/BattyBest/Simulgine/actions/workflows/rust.yml/badge.svg)](https://github.com/BattyBest/Simulgine/actions/workflows/rust.yml)
+
 ## The "Why?"
 
 Making simulations is annoying in most programming languages. You have to set
