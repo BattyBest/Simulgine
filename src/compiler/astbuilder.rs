@@ -52,6 +52,8 @@ impl<'a> ErrorUnwrap<&'a Token> for Option<&'a Token> {
 
 static LET_HINT: &str =
     "Let expressions follow this format: let [variable name]: [variable type] = [initial value];";
+static FIELD_HINT: &str =
+    "Field Definitions follow this format, [] indicating optionals: [Access] [Volatility] Type Name[::<stage>] [body] [= initial value]";
 
 impl<T: Iterator<Item = Token>> ASTBuilder<T> {
     pub(crate) fn synthesize_astbuilder(token_gen: T) -> ASTBuilder<T> {
@@ -538,14 +540,14 @@ impl<T: Iterator<Item = Token>> ASTBuilder<T> {
 
         // Type
 
-        let type_token = self.consume_hint(TokenType::Identifier, "Field Definitions follow this format, [] indicating optionals: [Access] [Volatility] Type Name[::<stage>] [body]");
+        let type_token = self.consume_hint(TokenType::Identifier, FIELD_HINT);
         let TokenValue::String(type_identifier) = type_token.value else {
             unreachable!()
         };
 
         // Name
 
-        let name_token = self.consume_hint(TokenType::Identifier, "Field Definitions follow this format, [] indicating optionals: [Access] [Volatility] Type Name[::<stage>] [body]");
+        let name_token = self.consume_hint(TokenType::Identifier, FIELD_HINT);
         let token = name_token.clone();
         let TokenValue::String(name) = name_token.value else {
             unreachable!()
@@ -563,15 +565,21 @@ impl<T: Iterator<Item = Token>> ASTBuilder<T> {
 
         // Body
 
-        let body = if change_level == FieldChangeLevel::Volatile {
-            let ret = Some(self.expression());
-            assert_eq!(self.blocks.len(), 0);
-            ret
-        } else {
-            None
-        };
+        let mut body = None;
+        let mut initial = None;
 
-        self.consume(TokenType::Terminator);
+        if change_level == FieldChangeLevel::Volatile {
+            body = Some(self.expression());
+            assert_eq!(self.blocks.len(), 0);
+            self.consume(TokenType::Terminator);
+            if self.consume_if(&[TokenType::OperatorAssign]).is_some() {
+                initial = Some(self.expression());
+                self.consume(TokenType::Terminator);
+            }
+        } else if self.consume_if(&[TokenType::Terminator]).is_none() {
+            initial = Some(self.expression());
+            self.consume(TokenType::Terminator);
+        };
 
         // Compose
 
@@ -583,6 +591,7 @@ impl<T: Iterator<Item = Token>> ASTBuilder<T> {
             turbofish,
             body,
             token,
+            initial,
         })
     }
 

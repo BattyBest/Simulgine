@@ -16,6 +16,7 @@ pub struct UserClassMember {
     pub(super) stage: NotNan<f64>,
     pub(super) access_level: FieldAccessLevel,
     pub(super) change_level: FieldChangeLevel,
+    pub(super) initial: TypeInstance,
 }
 
 impl PartialEq for UserClassMember {
@@ -95,7 +96,12 @@ impl UserObject {
         };
 
         for a in sim.get_user_class(t)?.fields.iter() {
-            ret.fields.push(spawn_type_instance(sim, &a.t));
+            ret.fields.push({
+                match a.initial {
+                    TypeInstance::None => spawn_type_instance(sim, &a.t),
+                    _ => a.initial.clone(),
+                }
+            });
         }
 
         Some(ret)

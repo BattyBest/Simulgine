@@ -62,7 +62,7 @@ impl From<ASTLinkError> for SimulgineErrors {
 }
 
 pub struct FASTExecContext<'a> {
-    vars: Vec<Vec<TypeReference<'a>>>,
+    pub(crate) vars: Vec<Vec<TypeReference<'a>>>,
 }
 
 pub fn tick_field<'a, 'c, 'd, 'e, 'g>(

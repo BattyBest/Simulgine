@@ -1,4 +1,4 @@
-use std::{collections::HashMap, format, sync::Mutex, write};
+use std::{collections::HashMap, format, mem, sync::Mutex, unreachable, write};
 
 use rayon::iter::{
     FromParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator,
@@ -8,9 +8,11 @@ use crate::compiler::scanner::FileScanner;
 
 use super::{
     ast::*,
-    runner::SimulgineErrors,
+    runner::{execute_fast_node, FASTExecContext, SimulgineErrors},
     scanner::Token,
-    simulgine_inst::{Simulgine, UserClass, UserClassIndx, UserClassMember},
+    simulgine_inst::{
+        spawn_type_instance_const, Simulgine, UserClass, UserClassIndx, UserClassMember,
+    },
 };
 
 fn find_type(
@@ -42,12 +44,26 @@ fn find_type(
 
 fn link_field(
     f: &ASTNodeDefinitionField,
+    initial: Option<ASTNode>,
     class_name: &str,
     user_classes: &HashMap<String, UserClassIndx>,
 ) -> Result<UserClassMember> {
     let t = find_type(&f.type_identifier, Some(user_classes));
 
     if let Some(t) = t {
+        let initial = initial
+            .map(|x| link_ast_node(x, LinkerInfo { env: None }, &[], &[t.clone().into()]))
+            .map_or(Ok(spawn_type_instance_const(&t)), |x| {
+                let res = execute_fast_node(&x?, &mut FASTExecContext { vars: vec![] }, None);
+                if let TypeReference::Instance(inst) = res {
+                    Ok(inst)
+                } else {
+                    unreachable!(
+                        "Got a TypeReference while executing a const context in an initializer"
+                    )
+                }
+            })?;
+
         Ok(UserClassMember {
             t: t.clone(),
             class: *user_classes.get(&class_name.to_string()).unwrap(),
@@ -56,6 +72,7 @@ fn link_field(
             stage: f.turbofish,
             access_level: f.access_level,
             change_level: f.change_level,
+            initial,
         })
     } else {
         Err(ASTLinkError {
@@ -147,7 +164,15 @@ pub fn link_ast(ast: AST) -> std::result::Result<Simulgine, SimulgineErrors> {
             let fields = x
                 .fields
                 .into_par_iter()
-                .map(|f| (link_field(&f, &x.name, &classes_map), f.body))
+                .map(|mut f| {
+                    (
+                        {
+                            let init = mem::take(&mut f.initial);
+                            link_field(&f, init, &x.name, &classes_map)
+                        },
+                        f.body,
+                    )
+                })
                 .filter_map(|x| {
                     if x.0.is_ok() {
                         Some(x)

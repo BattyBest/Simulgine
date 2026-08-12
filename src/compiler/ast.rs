@@ -795,6 +795,7 @@ pub struct ASTNodeDefinitionField {
     pub(crate) change_level: FieldChangeLevel,
     pub(crate) turbofish: NotNan<f64>,
     pub(crate) body: Option<ASTNode>,
+    pub(crate) initial: Option<ASTNode>,
     pub(crate) token: Token,
 }
 
