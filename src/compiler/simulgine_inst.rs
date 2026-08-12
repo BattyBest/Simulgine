@@ -16,6 +16,7 @@ pub struct UserClassMember {
     pub(super) stage: NotNan<f64>,
     pub(super) access_level: FieldAccessLevel,
     pub(super) change_level: FieldChangeLevel,
+    pub(super) initial: TypeInstance,
 }
 
 impl PartialEq for UserClassMember {
