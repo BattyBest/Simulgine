@@ -1,11 +1,14 @@
 mod compiler;
 use std::{
+    eprintln,
     io::{self, Write},
     path::Path,
 };
 
 use compiler::{
-    runner::{compile_directory, run_free_expression, run_simulgine, tick_sim},
+    runner::{
+        compile_directory, run_free_const_expression, run_free_expression, run_simulgine, tick_sim,
+    },
     simulgine_inst::SimulgineInst,
 };
 
@@ -57,11 +60,23 @@ fn tui(mut sim: SimulgineInst) {
 
         // Built-in commands
         if inp.chars().next().is_some_and(|x| x == '!') {
-            match inp {
+            match inp.split_whitespace().next().unwrap() {
                 "!print" => println!("{:?}", sim),
                 "!quit" => break,
                 "!tick" => tick_sim(&mut sim),
-                _ => eprintln!("Unrecognized Command. Available: print, quit, tick"),
+                "!const" => {
+                    if inp.len() <= 7 {
+                        eprintln!("Usage:\n\t!const [expr]\n\tExamples:\n\t\t!const 3 [-> [u8] 3]\n\t\t!const 4 + 5 [-> [u8] 9]");
+                        continue;
+                    }
+                    let expr = &inp[7..];
+                    let res = run_free_const_expression(expr);
+                    match res {
+                        Ok(x) => println!("{}", x.to_debug_string(&sim.based)),
+                        Err(x) => eprintln!("{}", x.to_string()),
+                    }
+                }
+                _ => eprintln!("Unrecognized Command. Available: print, quit, tick, const [expr]"),
             }
             continue;
         }
