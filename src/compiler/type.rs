@@ -603,6 +603,13 @@ impl TypeInstance {
         }
     }
 
+    pub fn coerce_user_class<'a>(&'a self) -> Option<&'a UserObject> {
+        match self {
+            TypeInstance::UserClass(x) => Some(&x.val),
+            _ => None,
+        }
+    }
+
     pub fn coerce_number_int(&self) -> Option<i128> {
         match self {
             TypeInstance::UserClass(_) => None,
@@ -717,6 +724,13 @@ impl TypeReference<'_> {
             TypeReference::UserClassRO(user_class_roinst) => {
                 TypeIdentifier::UserClass(user_class_roinst.val.class)
             }
+        }
+    }
+
+    pub fn coerce_user_class<'a>(&'a self) -> Option<&'a UserObject> {
+        match self {
+            TypeReference::Instance(type_instance) => type_instance.coerce_user_class(),
+            TypeReference::UserClassRO(user_class_roinst) => Some(user_class_roinst.val),
         }
     }
 

@@ -94,11 +94,29 @@ pub struct SimulgineInst<'a> {
     pub(crate) root: UserObject,
 }
 
+impl SimulgineInst<'_> {
+    /// Borrow the root object of the Simulgine instance.
+    pub fn get_root<'a>(&'a self) -> &'a UserObject {
+        &self.root
+    }
+}
+
 /// An instance of a user-defined class.
 #[derive(Clone, Debug)]
 pub struct UserObject {
     pub(crate) class: UserClassIndx,
     pub(crate) fields: Vec<TypeInstance>,
+}
+
+impl UserObject {
+    /// Gets the field of an user-defined class. Return None if the field doesn't exist.
+    pub fn get_field<'a>(&'a self, sim: &Simulgine, name: &str) -> Option<&'a TypeInstance> {
+        let class = sim.get_user_class(self.class).unwrap();
+
+        let f_i = class.field_names.get(name);
+
+        f_i.map(|x| self.fields.get(*x)).flatten()
+    }
 }
 
 impl UserObject {
