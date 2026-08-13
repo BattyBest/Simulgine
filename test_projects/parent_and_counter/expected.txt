@@ -1,0 +1,14 @@
+three;[u64] 0
+counter;[u64] 0
+!tick
+three;[u64] 3
+counter;[u64] 0
+!tick
+three;[u64] 3
+counter;[u64] 3
+!tick
+three;[u64] 3
+counter;[u64] 6
+!tick
+three;[u64] 3
+counter;[u64] 9

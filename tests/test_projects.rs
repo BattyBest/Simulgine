@@ -10,10 +10,23 @@ use simulgine::{
     run_simulgine,
 };
 
-#[test]
-fn test_hellosim() -> Result<(), SimulgineErrors> {
-    let path = "test_projects/hellosim";
+use test_case::test_case;
 
+#[test_case("test_projects/hellosim")]
+#[test_case("test_projects/simple_counter")]
+#[test_case("test_projects/const_field")]
+#[test_case("test_projects/parent_and_counter")]
+#[test_case("test_projects/initty_field")]
+#[test_case("test_projects/lots_braces")]
+#[test_case("test_projects/nostaging")]
+#[test_case("test_projects/yesstaging")]
+#[test_case("test_projects/ifwithbrace")]
+#[test_case("test_projects/ifwobrace")]
+#[test_case("test_projects/simple_braces")]
+#[test_case("test_projects/lotslets")]
+#[test_case("test_projects/lotserletser")]
+#[test_case("test_projects/nesting")]
+fn test_project(path: &str) -> Result<(), SimulgineErrors> {
     let compiled = compile_directory(Path::new(path))?;
 
     let mut sim = run_simulgine(&compiled);

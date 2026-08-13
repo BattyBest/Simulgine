@@ -1,0 +1,5 @@
+counter;[u64] 0
+!tick
+counter;[u64] 1
+!tick
+counter;[u64] 2

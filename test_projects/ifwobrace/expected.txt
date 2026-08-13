@@ -1,0 +1,20 @@
+counter;[u64] 0
+hello;[string] ""
+!tick
+counter;[u64] 1
+hello;[string] "counter less than or equal to three"
+!tick
+counter;[u64] 2
+hello;[string] "counter less than or equal to three"
+!tick
+counter;[u64] 3
+hello;[string] "counter less than or equal to three"
+!tick
+counter;[u64] 4
+hello;[string] "counter greater than three"
+!tick
+counter;[u64] 5
+hello;[string] "counter greater than three"
+!tick
+counter;[u64] 6
+hello;[string] "counter greater than three"

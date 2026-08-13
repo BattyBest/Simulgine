@@ -1,0 +1,11 @@
+hello;[string] ""
+follower;[string] ""
+!tick
+hello;[string] "Hello, world!"
+follower;[string] "Hello, world!"
+!tick
+hello;[string] "Hello, world!"
+follower;[string] "Hello, world!"
+!tick
+hello;[string] "Hello, world!"
+follower;[string] "Hello, world!"

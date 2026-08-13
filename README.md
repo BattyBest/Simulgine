@@ -312,7 +312,7 @@ class ROOT {
     u64 someRandomValue {
         let useless: u32 = 3;
         let other: u32 = {
-            let useless: u16 = 723
+            let useless: u16 = 723;
 
             useless; // 723
         };

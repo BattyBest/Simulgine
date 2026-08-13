@@ -3,15 +3,15 @@ class ROOT {
         let useless: u32 = 3;
         let moreUseless: u16 = 723;
         let other: u32 = {
-            let useless: u16 = moreUseless;
+            let useless: u16 = moreUseless; // 723
 
-            useless; // 724
-        };
+            useless; // 723
+        }; // 723
 
-        other = useless + other;
+        other = useless + other; // 726
         let useless: u32 = 8;
 
-        other + useless;
+        other + useless; // 734
     };
 }
 
