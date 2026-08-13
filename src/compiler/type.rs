@@ -1,5 +1,6 @@
 use super::simulgine_inst::{Simulgine, UserClassIndx, UserObject};
 
+/// Types (with no info) in Simulgine
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Type {
     UserClass,
@@ -22,6 +23,7 @@ pub enum Type {
     None,
 }
 
+/// Types in Simulgine
 #[derive(Debug, Clone)]
 pub enum TypeIdentifier {
     UserClass(UserClassIndx),
@@ -174,6 +176,22 @@ pub static INTEGER_NUMBERS: [Type; 8] = [
 pub static FLOATING_NUMBERS: [Type; 2] = [Type::Float, Type::Double];
 
 impl TypeIdentifier {
+    /// Checks if the given TypeIdentifier can be converted in to the TypeIdentifier this was called
+    /// with.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use simulgine::compiler::r#type::*;
+    /// // An i32 is convertible into an i64 with no loss.
+    /// assert_eq!(TypeIdentifier::I64.is_assignable_from(&TypeIdentifier::I32), true);
+    /// ```
+    ///
+    /// ```
+    /// # use simulgine::compiler::r#type::*;
+    /// // An i64 is not convertible into an i32 with no loss.
+    /// assert_eq!(TypeIdentifier::I32.is_assignable_from(&TypeIdentifier::I64), false);
+    /// ```
     pub fn is_assignable_from(&self, x: &TypeIdentifier) -> bool {
         match self {
             TypeIdentifier::None => true,
@@ -289,6 +307,22 @@ impl TypeIdentifier {
 }
 
 impl Type {
+    /// Checks if the given Type can be converted in to the Type this was called
+    /// with.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use simulgine::compiler::r#type::*;
+    /// // An i32 is convertible into an i64 with no loss.
+    /// assert_eq!(Type::I64.is_assignable_from(&Type::I32), true);
+    /// ```
+    ///
+    /// ```
+    /// # use simulgine::compiler::r#type::*;
+    /// // An i64 is not convertible into an i32 with no loss.
+    /// assert_eq!(Type::I32.is_assignable_from(&Type::I64), false);
+    /// ```
     pub fn is_assignable_from(&self, x: &Type) -> bool {
         match self {
             Type::None => true,
@@ -331,6 +365,7 @@ impl PartialEq for TypeIdentifier {
 }
 impl Eq for TypeIdentifier {}
 
+/// An instance of a Simulgine type.
 #[derive(Clone, Debug)]
 pub enum TypeInstance {
     UserClass(UserClassInst),
@@ -350,22 +385,26 @@ pub enum TypeInstance {
     None,
 }
 
+/// A reference to an instance or an instance of a Simulgine type.
 #[derive(Clone, Debug)]
 pub enum TypeReference<'a> {
     Instance(TypeInstance),
     UserClassRO(UserClassROInst<'a>),
 }
 
+/// An instance of a boolean.
 #[derive(Clone, Debug)]
 pub struct BooleanInst {
     pub val: bool,
 }
 
+/// An instance of a string.
 #[derive(Clone, Debug)]
 pub struct StringInst {
     pub val: String,
 }
 
+/// An instance of a boolean.
 #[derive(Clone, Debug)]
 pub struct DoubleInst {
     pub val: f64,
@@ -379,16 +418,19 @@ impl From<FloatInst> for DoubleInst {
     }
 }
 
+/// An instance of a float.
 #[derive(Clone, Debug)]
 pub struct FloatInst {
     pub val: f32,
 }
 
+/// An instance of an u8.
 #[derive(Clone, Debug)]
 pub struct U8Inst {
     pub val: u8,
 }
 
+/// An instance of an u16.
 #[derive(Clone, Debug)]
 pub struct U16Inst {
     pub val: u16,
@@ -402,6 +444,7 @@ impl From<U8Inst> for U16Inst {
     }
 }
 
+/// An instance of an u32.
 #[derive(Clone, Debug)]
 pub struct U32Inst {
     pub val: u32,
@@ -415,6 +458,7 @@ impl From<U16Inst> for U32Inst {
     }
 }
 
+/// An instance of an u64.
 #[derive(Clone, Debug)]
 pub struct U64Inst {
     pub val: u64,
@@ -428,11 +472,13 @@ impl From<U32Inst> for U64Inst {
     }
 }
 
+/// An instance of an i8.
 #[derive(Clone, Debug)]
 pub struct I8Inst {
     pub val: i8,
 }
 
+/// An instance of an i16.
 #[derive(Clone, Debug)]
 pub struct I16Inst {
     pub val: i16,
@@ -454,6 +500,7 @@ impl From<U8Inst> for I16Inst {
     }
 }
 
+/// An instance of an i32.
 #[derive(Clone, Debug)]
 pub struct I32Inst {
     pub val: i32,
@@ -475,6 +522,7 @@ impl From<U16Inst> for I32Inst {
     }
 }
 
+/// An instance of an i64.
 #[derive(Clone, Debug)]
 pub struct I64Inst {
     pub val: i64,
@@ -496,16 +544,19 @@ impl From<U32Inst> for I64Inst {
     }
 }
 
+/// An instance of a reflective type.
 #[derive(Clone, Debug)]
 pub struct TypeInst {
     pub val: TypeIdentifier,
 }
 
+/// An instance of an user-defined class.
 #[derive(Clone, Debug)]
 pub struct UserClassInst {
     pub val: UserObject,
 }
 
+/// A reference to an instance of an user-defined class.
 #[derive(Clone, Debug)]
 pub struct UserClassROInst<'a> {
     pub val: &'a UserObject,
