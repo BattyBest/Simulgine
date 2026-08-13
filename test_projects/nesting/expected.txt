@@ -1,0 +1,14 @@
+incorporationsIncorporated:stockPrice;[double] 0
+incorporationsIncorporated:finances:income;[double] 0
+incorporationsIncorporated:finances:expenses;[double] 0
+incorporationsIncorporated:finances:profit;[double] 0
+!tick
+incorporationsIncorporated:stockPrice;[double] 0.3
+incorporationsIncorporated:finances:income;[double] 5
+incorporationsIncorporated:finances:expenses;[double] 2
+incorporationsIncorporated:finances:profit;[double] 3
+!tick
+incorporationsIncorporated:stockPrice;[double] 0.6
+incorporationsIncorporated:finances:income;[double] 5
+incorporationsIncorporated:finances:expenses;[double] 2
+incorporationsIncorporated:finances:profit;[double] 3

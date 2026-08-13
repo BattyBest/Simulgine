@@ -1,0 +1,5 @@
+hello;[string] ""
+!tick
+hello;[string] "Hello, world!"
+!tick
+hello;[string] "Hello, world!"

@@ -61,11 +61,11 @@ impl From<ASTLinkError> for SimulgineErrors {
     }
 }
 
-pub struct FASTExecContext<'a> {
+pub(crate) struct FASTExecContext<'a> {
     pub(crate) vars: Vec<Vec<TypeReference<'a>>>,
 }
 
-pub fn tick_field<'a, 'c, 'd, 'e, 'g>(
+pub(crate) fn tick_field<'a, 'c, 'd, 'e, 'g>(
     prev: &'a TypeInstance,
     parent: &'g UserObject,
     field: &'c UserClassMember,
@@ -86,7 +86,7 @@ pub fn tick_field<'a, 'c, 'd, 'e, 'g>(
     }
 }
 
-pub fn calc_field(
+pub(crate) fn calc_field(
     i: usize,
     f: &TypeInstance,
     t: &UserObject,
@@ -107,7 +107,7 @@ pub fn calc_field(
     }
 }
 
-pub fn tick_obj(t: &UserObject, sim: &SimulgineInst) -> UserObject {
+pub(crate) fn tick_obj(t: &UserObject, sim: &SimulgineInst) -> UserObject {
     let class = sim.based.get_user_class(t.class).unwrap();
 
     let mut obj = t.clone();
@@ -128,6 +128,30 @@ pub fn tick_obj(t: &UserObject, sim: &SimulgineInst) -> UserObject {
     obj
 }
 
+/// Ticks the simulation forward.
+///
+/// Given a Simulgine instance, the root object is advanced by one tick. Since all objects are
+/// downstream of root, this means all objects are ticked.
+///
+/// # Examples
+///
+/// ```no_run
+/// use std::path::Path;
+/// use simulgine::run_simulgine;
+/// use simulgine::compiler::runner::compile_directory;
+/// # use simulgine::compiler::runner::SimulgineErrors;
+/// # use simulgine::compiler::runner::tick_sim;
+///
+/// # fn try_main() -> Result<(), SimulgineErrors> {
+/// let sim = compile_directory(Path::new("cool/project"))?;
+/// let mut sim = run_simulgine(&sim);
+/// tick_sim(&mut sim);
+/// # Ok(())
+/// # }
+/// # fn main() {
+/// # try_main().unwrap();
+/// # }
+/// ```
 pub fn tick_sim(sim: &mut SimulgineInst) {
     let fs = tick_obj(&sim.root, sim);
     sim.root = fs;
@@ -553,6 +577,25 @@ pub(crate) fn execute_fast_node<'a, 'b, 'c, 'f>(
     }
 }
 
+/// Compiles a directory of .sml files.
+///
+/// The given path is recursively traveled in order to find any files that end with the '.sml' file
+/// extention. They are then all taken together and compiled into a valid Simulgine object. The
+/// Simulgine object is not an instance of Simulgine. A file can technically be given instead of a
+/// directory, but it is not idiomatic to do so.
+///
+/// # Examples
+///
+/// ```no_run
+/// use std::path::Path;
+/// # use simulgine::compiler::runner::compile_directory;
+///
+/// compile_directory(Path::new("my/path/to/a/project"));
+/// ```
+///
+/// # Failures
+///
+/// The function will fail whenever the Simulgine code has an error.
 pub fn compile_directory(path: &Path) -> Result<Simulgine, SimulgineErrors> {
     let to_compile: Vec<PathBuf> = parse_all_sml_in_dir(path)?;
 

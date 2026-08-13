@@ -9,6 +9,7 @@ use super::ast::*;
 use super::fast::*;
 use super::r#type::*;
 
+/// A member of a User-Defined class.
 #[derive(Debug)]
 pub struct UserClassMember {
     pub(super) name: String,
@@ -35,6 +36,7 @@ impl Hash for UserClassMember {
     }
 }
 
+/// A user-defined class.
 #[derive(Debug)]
 pub struct UserClass {
     pub(super) name: String,
@@ -63,6 +65,9 @@ impl UserClass {
     }
 }
 
+/// Compiled Simulgine code.
+///
+/// Often referred to simply as a 'Simulgine' in the docs.
 #[derive(Debug)]
 pub struct Simulgine {
     pub(crate) user_class_names: HashMap<String, UserClassIndx>,
@@ -70,24 +75,48 @@ pub struct Simulgine {
 }
 
 impl Simulgine {
+    /// Gets the user-defined class for a given UserClassIndx.
+    ///
+    /// Using the UserClassIndx of one Simulgine in another Simulgine is **undefined behavior**.
     pub fn get_user_class(&self, i: UserClassIndx) -> Option<&UserClass> {
         self.user_classes.get(i.0)
     }
 }
 
+/// Represents an UserClass in a Simulgine.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct UserClassIndx(pub(super) usize);
 
+/// An instance of a Simulgine.
 #[derive(Debug)]
 pub struct SimulgineInst<'a> {
     pub based: &'a Simulgine,
     pub(crate) root: UserObject,
 }
 
+impl SimulgineInst<'_> {
+    /// Borrow the root object of the Simulgine instance.
+    pub fn get_root<'a>(&'a self) -> &'a UserObject {
+        &self.root
+    }
+}
+
+/// An instance of a user-defined class.
 #[derive(Clone, Debug)]
 pub struct UserObject {
     pub(crate) class: UserClassIndx,
     pub(crate) fields: Vec<TypeInstance>,
+}
+
+impl UserObject {
+    /// Gets the field of an user-defined class. Return None if the field doesn't exist.
+    pub fn get_field<'a>(&'a self, sim: &Simulgine, name: &str) -> Option<&'a TypeInstance> {
+        let class = sim.get_user_class(self.class).unwrap();
+
+        let f_i = class.field_names.get(name);
+
+        f_i.map(|x| self.fields.get(*x)).flatten()
+    }
 }
 
 impl UserObject {
