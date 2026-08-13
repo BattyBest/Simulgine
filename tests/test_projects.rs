@@ -1,4 +1,9 @@
-use std::path::Path;
+use std::{
+    assert_eq,
+    fs::File,
+    io::{BufRead, BufReader},
+    path::Path,
+};
 
 use simulgine::{
     compiler::runner::{compile_directory, tick_sim, SimulgineErrors},
@@ -13,25 +18,36 @@ fn test_hellosim() -> Result<(), SimulgineErrors> {
 
     let mut sim = run_simulgine(&compiled);
 
-    let root = sim.get_root();
+    let expected_file = File::open(Path::new(path).join("expected.txt"))?;
+    let file_buf = BufReader::new(expected_file).lines();
 
-    let hello_val = root
-        .get_field(&compiled, "hello")
-        .unwrap()
-        .to_debug_string(Some(&compiled));
+    for line in file_buf.map_while(Option::Some) {
+        let line = line?;
 
-    assert_eq!(hello_val, "[string] \"\"");
+        if line == "!tick" {
+            tick_sim(&mut sim);
+        } else {
+            let [specifier, expected] = {
+                let mut ls = line.split(";");
+                [ls.next().unwrap(), ls.next().unwrap()]
+            };
 
-    tick_sim(&mut sim);
+            let mut cur = sim.get_root();
+            let specs: Vec<_> = specifier.split(":").collect();
+            for spec in &specs[..specs.len() - 1] {
+                cur = cur
+                    .get_field(&compiled, spec)
+                    .unwrap()
+                    .coerce_user_class()
+                    .unwrap();
+            }
 
-    let root = sim.get_root();
+            let last = specs.last().unwrap();
+            let last = cur.get_field(&compiled, *last).unwrap();
 
-    let hello_val = root
-        .get_field(&compiled, "hello")
-        .unwrap()
-        .to_debug_string(Some(&compiled));
-
-    assert_eq!(hello_val, "[string] \"Hello, world!\"");
+            assert_eq!(last.to_debug_string(Some(&compiled)), expected)
+        }
+    }
 
     Ok(())
 }
