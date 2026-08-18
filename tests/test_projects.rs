@@ -26,6 +26,7 @@ use test_case::test_case;
 #[test_case("test_projects/lotslets")]
 #[test_case("test_projects/lotserletser")]
 #[test_case("test_projects/nesting")]
+#[test_case("test_projects/proppy_class")]
 fn test_project(path: &str) -> Result<(), SimulgineErrors> {
     let compiled = compile_directory(Path::new(path))?;
 

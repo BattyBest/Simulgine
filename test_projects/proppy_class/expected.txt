@@ -1,0 +1,5 @@
+inner:copyVal;3
+!tick
+inner:copyVal;4
+!tick
+inner:copyVal;5
