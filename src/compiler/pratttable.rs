@@ -257,6 +257,12 @@ pub const fn get_pratt_entry<T: Iterator<Item = Token>>(token_type: &TokenType) 
             infix: None,
         },
 
+        TokenType::Comma => PrattEntry {
+            precedence: Precedence::NONE,
+            prefix: None,
+            infix: None,
+        },
+
         TokenType::Terminator => PrattEntry {
             precedence: Precedence::NONE,
             prefix: None,

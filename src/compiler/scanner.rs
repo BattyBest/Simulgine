@@ -58,6 +58,8 @@ pub enum TokenType {
     OpenParen,
     CloseParen,
 
+    Comma,
+
     Terminator,
 
     Identifier,
@@ -446,6 +448,7 @@ impl FileScanner {
                 },
                 '^' => self.synthesize_token(TokenType::OperatorPow),
                 '.' => self.synthesize_token(TokenType::OperatorInner),
+                ',' => self.synthesize_token(TokenType::Comma),
                 _ if x.is_ascii_digit() => self.parse_number(),
                 _ if x.is_alphanumeric() => self.parse_identifier(),
                 '_' => self.parse_identifier(),

@@ -11,6 +11,14 @@ type ASTSubexpr = Box<ASTNode>;
 pub struct ASTNodeDefinitionClass {
     pub(crate) name: String,
     pub(crate) fields: Vec<ASTNodeDefinitionField>,
+    pub(crate) props: Vec<ASTDefinitionClassProp>,
+}
+
+// Currently equivalent to ASTVariable but don't mind.
+#[derive(PartialEq, Debug)]
+pub struct ASTDefinitionClassProp {
+    pub(crate) name: String,
+    pub(crate) t: TypeIdentifier,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]

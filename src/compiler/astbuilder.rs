@@ -596,10 +596,65 @@ impl<T: Iterator<Item = Token>> ASTBuilder<T> {
         })
     }
 
+    fn parse_props(&mut self) -> Option<Vec<ASTDefinitionClassProp>> {
+        let type_t = self.consume(TokenType::Identifier);
+        let t = if let TokenValue::String(t) = type_t.value {
+            t
+        } else {
+            return None;
+        };
+
+        let name_t = self.consume(TokenType::Identifier);
+        let name = if let TokenValue::String(t) = name_t.value {
+            t
+        } else {
+            return None;
+        };
+
+        let first = ASTDefinitionClassProp {
+            name,
+            t: TypeIdentifier::UnlinkedType(t),
+        };
+
+        let mut ret = vec![first];
+
+        while self.consume_if(&[TokenType::Comma]).is_some() {
+            let type_t = self.consume(TokenType::Identifier);
+            let t = if let TokenValue::String(t) = type_t.value {
+                t
+            } else {
+                return None;
+            };
+
+            let name_t = self.consume(TokenType::Identifier);
+            let name = if let TokenValue::String(t) = name_t.value {
+                t
+            } else {
+                return None;
+            };
+
+            let next = ASTDefinitionClassProp {
+                name,
+                t: TypeIdentifier::UnlinkedType(t),
+            };
+
+            ret.push(next);
+        }
+
+        Some(ret)
+    }
+
     fn parse_class(&mut self) -> Option<ASTNodeDefinitionClass> {
         self.consume_if_exist(TokenType::KeywordClass)?;
         let TokenValue::String(name) = self.consume(TokenType::Identifier).value else {
             return None;
+        };
+        let props = if self.consume_if(&[TokenType::OpenParen]).is_some() {
+            let ret = self.parse_props();
+            self.consume(TokenType::CloseParen);
+            ret?
+        } else {
+            vec![]
         };
         self.consume(TokenType::OpenBrace);
         let mut fields = Vec::new();
@@ -607,7 +662,11 @@ impl<T: Iterator<Item = Token>> ASTBuilder<T> {
             fields.push(self.parse_field()?);
         }
 
-        Some(ASTNodeDefinitionClass { name, fields })
+        Some(ASTNodeDefinitionClass {
+            name,
+            fields,
+            props,
+        })
     }
 }
 
