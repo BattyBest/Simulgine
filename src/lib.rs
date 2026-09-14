@@ -49,9 +49,9 @@ pub fn run_free_expression<'a>(
         LinkerInfo {
             env: Some(LinkerEnvInfo {
                 classes_map: &sim.based.user_class_names,
-                cur_class: None,
                 classes: &sim.based.user_classes,
             }),
+            cur_class: None,
         },
         variables,
         &TYPES,
@@ -95,7 +95,15 @@ pub fn run_free_const_expression<'b>(expr: &str) -> Result<TypeReference<'b>, Si
 
     let variables: &[&[&ASTVariable]] = &[];
 
-    let fast = link_ast_node(parse, LinkerInfo { env: None }, variables, &TYPES)?;
+    let fast = link_ast_node(
+        parse,
+        LinkerInfo {
+            env: None,
+            cur_class: None,
+        },
+        variables,
+        &TYPES,
+    )?;
 
     Ok(execute_fast_node(
         &fast,

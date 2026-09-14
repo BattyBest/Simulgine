@@ -54,7 +54,17 @@ fn link_field(
 
     if let Some(t) = t {
         let initial = initial
-            .map(|x| link_ast_node(x, LinkerInfo { env: None }, &[], &[t.clone().into()]))
+            .map(|x| {
+                link_ast_node(
+                    x,
+                    LinkerInfo {
+                        env: None,
+                        cur_class: Some(user_classes.get(&class_name.to_string()).unwrap()),
+                    },
+                    &[],
+                    &[t.clone().into()],
+                )
+            })
             .map_or(Ok(spawn_type_instance_const(&t)), |x| {
                 let res = execute_fast_node(&x?, &mut FASTExecContext { vars: vec![] }, None);
                 if let TypeReference::Instance(inst) = res {
@@ -102,9 +112,9 @@ fn link_field_body(
             LinkerInfo {
                 env: Some(LinkerEnvInfo {
                     classes_map: user_classes_map,
-                    cur_class: Some(&parent),
                     classes: user_classes,
                 }),
+                cur_class: Some(&parent),
             },
             &[&[
                 &ASTVariable {
@@ -301,13 +311,13 @@ type VariableII<'a, 'b> = [&'a [&'b ASTVariable]];
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct LinkerEnvInfo<'a> {
     pub(crate) classes_map: &'a HashMap<String, UserClassIndx>,
-    pub(crate) cur_class: Option<&'a UserClassIndx>, //cur_class is None == REPL context
     pub(crate) classes: &'a [UserClass],
 }
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct LinkerInfo<'a> {
     pub(crate) env: Option<LinkerEnvInfo<'a>>, // Env is None == Const context
+    pub(crate) cur_class: Option<&'a UserClassIndx>, //cur_class is None == REPL context
 }
 
 fn ast_linking_need_x_unary(
@@ -868,8 +878,8 @@ pub fn link_ast_node(
                             err: ASTLinkErrorInner::ConstContextInvalid(str.to_string()),
                         });
                     }
-                    let info = info.env.unwrap();
-                    let cl = info.classes.get(class.0).unwrap();
+                    let env = info.env.unwrap();
+                    let cl = env.classes.get(class.0).unwrap();
                     let f = cl.field_names.get(&str);
                     if let Some(y) = f {
                         let f = &cl.fields[*y];
@@ -903,7 +913,7 @@ pub fn link_ast_node(
                         Err(ASTLinkError {
                             token: Box::new(token),
                             err: ASTLinkErrorInner::NonexistentField(
-                                info.classes[class.0].name.clone(),
+                                env.classes[class.0].name.clone(),
                                 str,
                             ),
                         })
